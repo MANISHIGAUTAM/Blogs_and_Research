@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manishi Gautam — Research</title>
+<meta name="description" content="Manishi Gautam — Browser security & federated identity research.">
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2330;
+    --text: #e6edf3; --muted: #8b949e; --border: #30363d;
+    --accent: #58a6ff; --accent2: #3fb950; --warn: #d29922; --danger: #f85149;
+    --shadow: 0 8px 30px rgba(0,0,0,.4);
+  }
+  [data-theme="light"] {
+    --bg: #f6f8fa; --bg2: #ffffff; --bg3: #eef2f6;
+    --text: #1f2328; --muted: #57606a; --border: #d0d7de;
+    --accent: #0969da; --accent2: #1a7f37; --warn: #9a6700; --danger: #cf222e;
+    --shadow: 0 8px 30px rgba(140,149,159,.2);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.6; transition: background .3s, color .3s; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+
+  /* ---------- Nav ---------- */
+  nav { position:sticky; top:0; z-index:100; background:color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px); border-bottom:1px solid var(--border); }
+  .nav-inner { max-width:1000px; margin:0 auto; padding:.7rem 1.2rem; display:flex; align-items:center; gap:1.2rem; }
+  .nav-inner .brand { font-weight:700; font-size:1rem; color:var(--text); }
+  .nav-links { display:flex; gap:1rem; margin-left:auto; align-items:center; flex-wrap:wrap; }
+  .nav-links a { color:var(--muted); font-size:.9rem; }
+  .nav-links a:hover { color:var(--accent); text-decoration:none; }
+  #themeToggle { background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:20px; padding:.3rem .8rem; cursor:pointer; font-size:.85rem; }
+  #themeToggle:hover { border-color:var(--accent); }
+
+  .wrap { max-width:1000px; margin:0 auto; padding:0 1.2rem; }
+
+  /* ---------- Hero ---------- */
+  header.hero { padding:4.5rem 0 3rem; display:flex; gap:2.2rem; align-items:center; flex-wrap:wrap; }
+  .avatar { width:140px; height:140px; border-radius:50%; background:linear-gradient(135deg, var(--accent), #a371f7); display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:800; color:#fff; box-shadow:var(--shadow); flex-shrink:0; }
+  .hero h1 { font-size:2.2rem; letter-spacing:-.02em; }
+  .hero .tagline { color:var(--muted); font-size:1.05rem; margin:.3rem 0 .9rem; max-width:560px; }
+  .badges { display:flex; gap:.5rem; flex-wrap:wrap; }
+  .badge { font-size:.78rem; padding:.25rem .7rem; border-radius:20px; border:1px solid var(--border); background:var(--bg2); color:var(--muted); }
+  .badge.hl { border-color:var(--accent); color:var(--accent); }
+  .hero-links { margin-top:1rem; display:flex; gap:1rem; flex-wrap:wrap; font-size:.9rem; }
+
+  section { padding:2.5rem 0; }
+  h2.sec { font-size:1.5rem; margin-bottom:.4rem; letter-spacing:-.01em; }
+  .sec-sub { color:var(--muted); margin-bottom:1.6rem; font-size:.95rem; }
+
+  /* ---------- Research idea cards ---------- */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(290px,1fr)); gap:1rem; }
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:1.3rem; transition:transform .2s, border-color .2s, box-shadow .2s; cursor:pointer; position:relative; }
+  .card:hover { transform:translateY(-4px); border-color:var(--accent); box-shadow:var(--shadow); }
+  .card .status { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
+  .s-active { color:var(--accent2); } .s-explore { color:var(--warn); } .s-idea { color:var(--muted); }
+  .card h3 { font-size:1.05rem; margin:.4rem 0 .5rem; }
+  .card p { font-size:.88rem; color:var(--muted); }
+  .card .tags { margin-top: .8rem; display:flex; gap:.4rem; flex-wrap:wrap; }
+  .tag { font-size:.7rem; background:var(--bg3); border-radius:6px; padding:.15rem .5rem; color:var(--muted); }
+
+  /* ---------- Featured study ---------- */
+  .featured { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:2rem; box-shadow:var(--shadow); }
+  .featured .kicker { color:var(--accent); font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; }
+  .featured h2 { font-size:1.6rem; margin:.4rem 0 .8rem; letter-spacing:-.01em; }
+  .featured .lede { color:var(--muted); font-size:.95rem; margin-bottom:1.5rem; }
+
+  /* Tabs */
+  .tabs { display:flex; gap:.4rem; flex-wrap:wrap; border-bottom:1px solid var(--border); margin-bottom:1.4rem; }
+  .tab-btn { background:none; border:none; color:var(--muted); padding:.6rem 1rem; cursor:pointer; font-size:.9rem; border-bottom:2px solid transparent; margin-bottom:-1px; font-family:inherit; }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .tab-panel { display:none; animation:fadeIn .25s ease; }
+  .tab-panel.active { display:block; }
+  @keyframes fadeIn { from {opacity:0; transform:translateY(4px);} to {opacity:1; transform:none;} }
+
+  .tab-panel h4 { margin:1.1rem 0 .5rem; font-size:1rem; }
+  .tab-panel p, .tab-panel li { font-size:.92rem; }
+  .tab-panel ul { padding-left:1.3rem; margin:.5rem 0; }
+  .tab-panel li { margin:.35rem 0; }
+  .callout { border-left:3px solid var(--accent); background:var(--bg3); padding: .8rem 1rem; border-radius:0 8px 8px 0; margin:1rem 0; font-size:.9rem; }
+  .callout.warn { border-color:var(--warn); }
+  .callout.danger { border-color:var(--danger); }
+
+  /* Tables */
+  .tbl-wrap { overflow-x:auto; margin:1rem 0; border:1px solid var(--border); border-radius:10px; }
+  table { border-collapse:collapse; width:100%; font-size:.84rem; min-width:680px; }
+  th, td { padding:.55rem .7rem; text-align:left; border-bottom:1px solid var(--border); }
+  th { background:var(--bg3); font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); position:sticky; top:0; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:color-mix(in srgb, var(--accent) 6%, transparent); }
+  .yes { color:var(--accent2); font-weight:600; } .no { color:var(--danger); font-weight:600; } .partial { color:var(--warn); font-weight:600; }
+
+  /* Accordions */
+  details.acc { border:1px solid var(--border); border-radius:10px; margin:.6rem 0; background:var(--bg); overflow:hidden; }
+  details.acc summary { cursor:pointer; padding:.85rem 1rem; font-weight:600; font-size:.92rem; list-style:none; display:flex; align-items:center; gap:.6rem; user-select:none; }
+  details.acc summary::-webkit-details-marker { display:none; }
+  details.acc summary::before { content:"▸"; color:var(--accent); transition:transform .2s; }
+  details.acc[open] summary::before { transform:rotate(90deg); }
+  details.acc .acc-body { padding:0 1rem 1rem; color:var(--text); }
+  .pill { font-size:.68rem; padding:.1rem .55rem; border-radius:12px; font-weight:700; margin-left:auto; }
+  .p-high { background:color-mix(in srgb,var(--accent2) 18%, transparent); color:var(--accent2); }
+  .p-med { background:color-mix(in srgb,var(--warn) 18%, transparent); color:var(--warn); }
+  .p-low { background:color-mix(in srgb,var(--danger) 18%, transparent); color:var(--danger); }
+
+  /* Threat meter */
+  .threat { margin: .8rem 0; }
+  .threat .t-head { display:flex; justify-content:space-between; font-size:.88rem; margin-bottom:.25rem; }
+  .meter { height:8px; border-radius:4px; background:var(--bg3); overflow:hidden; }
+  .meter > div { height:100%; border-radius:4px; transition:width 1s ease; width:0; }
+  .m-low > div { background:var(--accent2); } .m-med > div { background:var(--warn); } .m-high > div { background:var(--danger); }
+
+  /* Timeline */
+  .timeline { position:relative; padding-left:1.6rem; margin:1rem 0; }
+  .timeline::before { content:""; position:absolute; left:6px; top:6px; bottom:6px; width:2px; background:var(--border); }
+  .tl-item { position:relative; margin-bottom:1.1rem; }
+  .tl-item::before { content:""; position:absolute; left:-1.6rem; top:.35rem; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg2); }
+  .tl-item strong { display:block; font-size:.92rem; }
+  .tl-item span { color:var(--muted); font-size:.86rem; }
+
+  footer { border-top:1px solid var(--border); padding:2rem 0 3rem; color:var(--muted); font-size:.85rem; text-align:center; }
+
+  @media (max-width:640px){
+    header.hero { padding-top:2.5rem; }
+    .hero h1 { font-size:1.7rem; }
+    .featured { padding:1.3rem; }
+  }
+</style>
+</head>
+<body data-theme="dark">
+
+<nav>
+  <div class="nav-inner">
+    <span class="brand">Manishi Gautam</span>
+    <div class="nav-links">
+      <a href="#ideas">Research Ideas</a>
+      <a href="#featured">Featured Study</a>
+      <a href="#contact">Contact</a>
+      <button id="themeToggle">🌙 Dark</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero wrap">
+  <div class="avatar">MG</div>
+  <div>
+    <h1>Manishi Gautam</h1>
+    <p class="tagline">Researcher in <strong>browser security, federated identity, and web platform architecture</strong>. Exploring how browsers can become trustworthy enforcement points for identity, sessions, and privacy.</p>
+    <div class="badges">
+      <span class="badge hl">Browser Internals</span>
+      <span class="badge hl">Federated Identity</span>
+      <span class="badge">Chromium</span>
+      <span class="badge">FedCM</span>
+      <span class="badge">OAuth / OIDC</span>
+      <span class="badge">Zero Trust</span>
+    </div>
+    <div class="hero-links">
+      <a href="https://github.com/" target="_blank">GitHub ↗</a>
+      <a href="#contact">Email</a>
+      <a href="#featured">Latest work ↓</a>
+    </div>
+  </div>
+</header>
+
+<!-- ============ RESEARCH IDEAS ============ -->
+<section id="ideas" class="wrap">
+  <h2 class="sec">Research Ideas</h2>
+  <p class="sec-sub">Current explorations, ranked by maturity. Click any card to jump to detail (where available).</p>
+  <div class="cards">
+
+    <div class="card" onclick="location.href='#featured'">
+      <span class="status s-active">● Active — Feasibility Study Complete</span>
+      <h3>Browser-Mediated Federated Session Revocation</h3>
+      <p>Can an IdP trigger the browser to forcibly destroy a relying party's authenticated state — even when the RP never implemented logout? A full Chromium-level feasibility study.</p>
+      <div class="tags"><span class="tag">FedCM</span><span class="tag">Clear-Site-Data</span><span class="tag">CAEP</span><span class="tag">Chromium</span></div>
+    </div>
+
+    <div class="card">
+      <span class="status s-explore">● Exploring</span>
+      <h3>DBSC-Anchored Revocation</h3>
+      <p>If sessions are bound to TPM/Secure Enclave keys (Device Bound Session Credentials), is destroying the bound key a cleaner revocation primitive than blanket storage wipes?</p>
+      <div class="tags"><span class="tag">DBSC</span><span class="tag">TPM</span><span class="tag">Session Security</span></div>
+    </div>
+
+    <div class="card">
+      <span class="status s-explore">● Exploring</span>
+      <h3>Browser as CAEP/SSF Receiver</h3>
+      <p>An enterprise profile where the browser verifies signed <code>session-revoked</code> Security Event Tokens against admin-pinned IdP keys — closing the client leg of zero-trust revocation.</p>
+      <div class="tags"><span class="tag">Shared Signals</span><span class="tag">Enterprise</span><span class="tag">SET/JWT</span></div>
+    </div>
+
+    <div class="card">
+      <span class="status s-idea">● Idea</span>
+      <h3>Quantifying the Reauth-Undo Problem</h3>
+      <p>Measure how often "logged out" sessions silently resurrect via live IdP sessions, FedCM auto-reauth, or passkey conditional UI — the key correctness metric for any revocation system.</p>
+      <div class="tags"><span class="tag">Measurement</span><span class="tag">WebAuthn</span><span class="tag">Telemetry</span></div>
+    </div>
+
+    <div class="card">
+      <span class="status s-idea">● Idea</span>
+      <h3>Live-Runtime Token Invalidation</h3>
+      <p>Storage wipes don't touch V8-heap bearer tokens, bfcached documents, or open WebSockets. What's the least disruptive execution-context teardown the platform could offer?</p>
+      <div class="tags"><span class="tag">V8</span><span class="tag">BFCache</span><span class="tag">Renderer</span></div>
+    </div>
+
+    <div class="card">
+      <span class="status s-idea">● Idea</span>
+      <h3>Per-Account Storage Partitioning</h3>
+      <p>Multi-account sites share one StorageKey, making per-user revocation impossible. Could RP-declared account namespaces give browsers account-granular deletion?</p>
+      <div class="tags"><span class="tag">StorageKey</span><span class="tag">Multi-Account</span><span class="tag">Standards</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ FEATURED STUDY ============ -->
+<section id="featured" class="wrap">
+  <div class="featured">
+    <span class="kicker">Featured Feasibility Study</span>
+    <h2>Browser-Mediated Federated Session Revocation</h2>
+    <p class="lede">When you click "log out everywhere" at your identity provider, tokens in <code>localStorage</code>, HttpOnly cookies, service-worker caches, and live JS memory survive on every relying party. This study asks: can the <strong>browser</strong> — which physically holds that state — become the enforcement point?</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="t-summary">Summary</button>
+      <button class="tab-btn" data-tab="t-problem">The Problem</button>
+      <button class="tab-btn" data-tab="t-storage">Where Auth Lives</button>
+      <button class="tab-btn" data-tab="t-options">Design Options</button>
+      <button class="tab-btn" data-tab="t-threats">Threat Model</button>
+      <button class="tab-btn" data-tab="t-plan">Prototype Plan</button>
+      <button class="tab-btn" data-tab="t-open">Open Problems</button>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="tab-panel active" id="t-summary">
+      <div class="callout"><strong>Verdict:</strong> Technically feasible as a Chromium-only prototype today, partially standardizable within 2–3 years — but "perfect" revocation is impossible without sacrificing multi-account convenience and accepting a trust-bootstrapping problem.</div>
+      <h4>Three key findings</h4>
+      <ul>
+        <li><strong>The deletion machinery already exists.</strong> Chromium's <code>Clear-Site-Data</code> / <code>StoragePartition::ClearData</code> can destroy every disk-backed auth surface. The gap is the trusted <em>transport</em> for the revocation signal — and live-tab invalidation of in-memory tokens.</li>
+        <li><strong>Trust bootstrapping is the hardest problem.</strong> A browser has no cryptographic relationship authorizing an arbitrary IdP to wipe an arbitrary site. The defensible fix: scope the IdP's authority to RPs the browser <em>observed</em> the user federate into via FedCM — converting "clear any site" into "clear sites you introduced me to."</li>
+        <li><strong>Full origin destruction beats selective cleanup.</strong> The browser cannot read auth semantics — it deletes by origin, not by "is this a token." Full StorageKey destruction is the only model that works without RP cooperation, at the cost of logging out all co-resident accounts.</li>
+      </ul>
+      <h4>Recommendation</h4>
+      <p>Pursue as a <strong>FedCM-scoped, connected-accounts-authorized revocation extension</strong>, prototyped behind a Chromium flag + enterprise policy. Target the <strong>enterprise / zero-trust market first</strong> — where managed trust and multi-account sacrifice are acceptable — before consumer-web standardization. Never market it as "perfect logout": without IdP server-session termination, revocation can be silently undone by reauthentication.</p>
+    </div>
+
+    <!-- PROBLEM -->
+    <div class="tab-panel" id="t-problem">
+      <h4>Why today's mechanisms fail</h4>
+      <ul>
+        <li><strong>OIDC Front-Channel Logout</strong> — defeated by third-party cookie blocking; requires the RP to implement it and a live browser session.</li>
+        <li><strong>OIDC Back-Channel Logout</strong> — server-to-server only; never touches the browser, so SPA tokens in <code>localStorage</code> and service-worker caches persist.</li>
+        <li><strong>OAuth Token Revocation (RFC 7009)</strong> — a courtesy notification, not a guarantee; does nothing client-side and doesn't invalidate issued JWTs.</li>
+        <li><strong>CAEP / Shared Signals + CAE</strong> — near-real-time but server-side only, with propagation latency up to ~15 minutes.</li>
+      </ul>
+      <div class="callout warn"><strong>The unmet need:</strong> enforce revocation even when the RP never implemented proper logout, by making the browser the enforcement point.</div>
+      <h4>The six state domains</h4>
+      <div class="tbl-wrap"><table>
+        <tr><th>Domain</th><th>Examples</th><th>Browser can mutate?</th></tr>
+        <tr><td>Browser-owned</td><td>FedCM Login Status map, connected-accounts set</td><td class="yes">Freely</td></tr>
+        <tr><td>Website-owned</td><td>Cookies, localStorage, IndexedDB, SW caches</td><td class="yes">Yes (physically holds it)</td></tr>
+        <tr><td>IdP state</td><td>IdP server sessions</td><td class="no">Out of reach</td></tr>
+        <tr><td>Tab/runtime</td><td>JS heap tokens, Authorization headers</td><td class="partial">Only via context destruction</td></tr>
+        <tr><td>Profile-wide</td><td>All origins in a profile</td><td class="yes">Yes — but never cross-profile</td></tr>
+        <tr><td>Origin/StorageKey</td><td>Natural granularity of web storage</td><td class="yes">The deletion unit</td></tr>
+      </table></div>
+    </div>
+
+    <!-- STORAGE -->
+    <div class="tab-panel" id="t-storage">
+      <h4>Can the browser reliably destroy each surface?</h4>
+      <div class="tbl-wrap"><table>
+        <tr><th>Surface</th><th>Reliable delete?</th><th>Knows it's auth?</th><th>Fallback</th></tr>
+        <tr><td>Cookies (incl. HttpOnly)</td><td class="yes">Yes</td><td class="no">No</td><td>Delete all for eTLD+1 (subdomains affected)</td></tr>
+        <tr><td>localStorage / IndexedDB</td><td class="yes">Yes, per StorageKey</td><td class="no">No</td><td>Wipe origin storage</td></tr>
+        <tr><td>Cache Storage</td><td class="yes">Yes (async)</td><td class="no">No</td><td>Wipe — offline authed responses gone</td></tr>
+        <tr><td>Service Worker registration</td><td class="yes">Yes</td><td class="no">No</td><td>Stop worker, then unregister</td></tr>
+        <tr><td>JS runtime memory (V8 heap)</td><td class="no">No — not directly</td><td class="no">No</td><td>Force reload / kill renderer</td></tr>
+        <tr><td>BFCache'd documents</td><td class="partial">Needs explicit flush</td><td class="no">No</td><td>Flush bfcache for site</td></tr>
+        <tr><td>Open WebSocket / SSE</td><td class="no">Survives cookie deletion</td><td class="no">No</td><td>Context destruction</td></tr>
+        <tr><td>DBSC bound session key</td><td class="yes">Yes</td><td class="yes">Yes — it IS the session</td><td>Clear; session dies on next refresh</td></tr>
+        <tr><td>FedCM connected-accounts</td><td class="yes">Yes (browser-owned)</td><td class="yes">Yes</td><td>Reset to logged-out</td></tr>
+      </table></div>
+      <div class="callout danger"><strong>Key insight:</strong> every <em>disk-backed</em> surface is destroyable — but the browser can't read auth semantics, live runtime tokens require disruptive context teardown, and cookie deletion is inherently eTLD+1-wide.</div>
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="tab-panel" id="t-options">
+      <h4>Transport & trust model options, ranked</h4>
+
+      <details class="acc" open>
+        <summary>Option A — FedCM-scoped revocation extension <span class="pill p-high">BEST</span></summary>
+        <div class="acc-body"><p>Extend FedCM so an IdP can trigger destruction of local RP state — honored <strong>only for RPs in the browser's connected-accounts set for that IdP</strong>. Authority is rooted in browser-owned federation records, not IdP pre-registration. Bounded: an IdP can only clear sites it actually introduced. <em>Caveat: only covers FedCM-integrated RPs; legacy OAuth-redirect logins leave no record.</em></p></div>
+      </details>
+      <details class="acc">
+        <summary>Option B — Signed CAEP Security Event Token <span class="pill p-high">ENTERPRISE</span></summary>
+        <div class="acc-body"><p>IdP emits a signed <code>session-revoked</code> SET over the Shared Signals Framework; the browser (or managed component) verifies against pinned JWKS and maps subjects to RP origins. The only path that handles <strong>non-cooperating legacy RPs</strong> — because the admin supplies the authorization mapping.</p></div>
+      </details>
+      <details class="acc">
+        <summary>Option C — Clear-Site-Data via RP response <span class="pill p-med">SHIPS TODAY</span></summary>
+        <div class="acc-body"><p>RP emits <code>Clear-Site-Data: "*"</code> on a logout endpoint the IdP can trigger. Zero browser changes — but requires RP participation, failing the core premise.</p></div>
+      </details>
+      <details class="acc">
+        <summary>Options D–G — Push, polling, vendor sync <span class="pill p-low">WEAKER</span></summary>
+        <div class="acc-body"><p><strong>Web-Push-like channel</strong>: subscription belongs to the RP's service worker, reintroducing RP dependency. <strong>Polling</strong>: reliable fallback but latency-bound, with a privacy-sensitive phone-home. <strong>Vendor sync/push</strong>: only works when the IdP <em>is</em> the browser vendor — not general.</p></div>
+      </details>
+
+      <div class="tbl-wrap"><table>
+        <tr><th>Option</th><th>Works if IdP ≠ browser owner?</th><th>RP changes?</th><th>Standards feasibility</th></tr>
+        <tr><td>A. FedCM extension</td><td class="yes">Yes</td><td class="yes">Minimal/none</td><td class="yes">High</td></tr>
+        <tr><td>B. CAEP signed SET</td><td class="yes">Yes (enterprise)</td><td class="yes">None</td><td class="partial">Medium-High</td></tr>
+        <tr><td>C. Clear-Site-Data</td><td class="yes">Yes</td><td class="no">Required</td><td class="yes">Shipped</td></tr>
+        <tr><td>D. Web-Push-like</td><td class="partial">Partly</td><td class="no">Required</td><td class="partial">Medium</td></tr>
+        <tr><td>E. Polling</td><td class="yes">Yes</td><td class="yes">None</td><td class="yes">High</td></tr>
+        <tr><td>F/G. Vendor sync/push</td><td class="no">No</td><td class="yes">None</td><td class="no">Low</td></tr>
+      </table></div>
+    </div>
+
+    <!-- THREATS -->
+    <div class="tab-panel" id="t-threats">
+      <h4>Threat assessment (residual risk after mitigation)</h4>
+      <div class="threat"><div class="t-head"><span>Malicious IdP clears arbitrary sites</span><span>Bounded</span></div><div class="meter m-low"><div data-w="20%"></div></div>
+        <p style="font-size:.84rem;color:var(--muted)">Connected-accounts scoping: IdP can only clear RPs it actually federated.</p></div>
+      <div class="threat"><div class="t-head"><span>Spoofed / replayed logout events</span><span>Low</span></div><div class="meter m-low"><div data-w="15%"></div></div>
+        <p style="font-size:.84rem;color:var(--muted)">JWT signatures + <code>jti</code>/<code>iat</code> replay cache; re-clearing is idempotent.</p></div>
+      <div class="threat"><div class="t-head"><span>Race window during async deletion</span><span>Medium</span></div><div class="meter m-med"><div data-w="45%"></div></div>
+        <p style="font-size:.84rem;color:var(--muted)">Terminate → clear → block ordering bounds it to sub-second; not eliminated.</p></div>
+      <div class="threat"><div class="t-head"><span>Compromised IdP mass-revocation</span><span>Medium</span></div><div class="meter m-med"><div data-w="50%"></div></div>
+        <p style="font-size:.84rem;color:var(--muted)">Inherent: the IdP is trusted for its own RPs. Rate limits + visible UI.</p></div>
+      <div class="threat"><div class="t-head"><span>Reauthentication-undo (the deepest residual)</span><span>High</span></div><div class="meter m-high"><div data-w="75%"></div></div>
+        <p style="font-size:.84rem;color:var(--muted)">A live IdP session, FedCM auto-reauth, or RP-side <strong>passkeys</strong> can silently resurrect the session. Browser revocation must be paired with IdP server-session kill — and passkey reauth can't be closed by IdP cooperation at all.</p></div>
+      <div class="callout"><strong>Privacy posture:</strong> authority derives from data the browser already holds (no new disclosure), revocation results are never JS-observable, and any polling must be minimized — though credentialed revocation polling is inherently identifying, an unresolved tension.</div>
+    </div>
+
+    <!-- PLAN -->
+    <div class="tab-panel" id="t-plan">
+      <h4>Incremental Chromium prototype path</h4>
+      <div class="timeline">
+        <div class="tl-item"><strong>Phase 0 — Extension PoC (~weeks)</strong><span>MV3 extension: <code>chrome.browsingData.remove()</code> origin-scoped, triggered by IdP poll. Proves the deletion + transport loop without a Chromium fork.</span></div>
+        <div class="tl-item"><strong>Phase 1 — Native trigger behind a flag</strong><span><code>StoragePartition::ClearData</code> + cookie filter, gated strictly on the FedCM connected-accounts set. Enterprise policy controlled.</span></div>
+        <div class="tl-item"><strong>Phase 2 — Live-tab invalidation</strong><span>Stop service workers → destroy/reload renderer documents → flush bfcache → block new origin requests until <code>DataRemovalObserver</code> confirms. (Note: <code>executionContexts</code> teardown must be built — Chromium never shipped it.)</span></div>
+        <div class="tl-item"><strong>Phase 3 — FedCM trust/transport</strong><span>IdP's credentialed signal sets Login Status → logged-out and triggers cleanup, preventing auto-reauth.</span></div>
+        <div class="tl-item"><strong>Phase 4 — Enterprise CAEP receiver</strong><span>Verify <code>session-revoked</code> SETs against admin-pinned JWKS; subject → RP-origin mapping via managed config.</span></div>
+      </div>
+      <div class="callout"><strong>Key telemetry:</strong> the <em>reauthentication-after-revocation rate</em>. If it exceeds low single digits, the feature is functionally void without mandatory IdP server-session kill.</div>
+    </div>
+
+    <!-- OPEN PROBLEMS -->
+    <div class="tab-panel" id="t-open">
+      <h4>Unsolved & structural problems</h4>
+      <details class="acc"><summary>1. The reauthentication-undo problem <span class="pill p-low">UNSOLVED</span></summary>
+        <div class="acc-body"><p>If the IdP server session lives, or the RP supports passkeys, a revoked RP silently re-auths. Pure-browser revocation without server cooperation is incomplete by construction.</p></div></details>
+      <details class="acc"><summary>2. Live-runtime token clearing <span class="pill p-med">PARTIAL</span></summary>
+        <div class="acc-body"><p>V8-heap tokens can't be surgically removed; only context destruction works — which loses in-flight user work. No non-disruptive solution exists.</p></div></details>
+      <details class="acc"><summary>3. eTLD+1 cookie blast radius <span class="pill p-med">STRUCTURAL</span></summary>
+        <div class="acc-body"><p>Clearing cookies for one origin clears subdomains too. <code>__Host-</code> prefixed cookies are the partial, RP-cooperative fix.</p></div></details>
+      <details class="acc"><summary>4. Multi-account disambiguation <span class="pill p-low">UNSOLVABLE AT BROWSER LEVEL</span></summary>
+        <div class="acc-body"><p>Co-resident accounts share one StorageKey; the browser cannot tell user 1 from user 2. Full-origin destruction logs out everyone — acceptable in enterprise, not as a silent consumer default.</p></div></details>
+      <details class="acc"><summary>5. Bootstrapping for non-FedCM logins <span class="pill p-med">SCOPING GAP</span></summary>
+        <div class="acc-body"><p>Classic OAuth-redirect logins leave no connected-accounts record, so FedCM scoping doesn't apply. These need the enterprise CAEP path or RP cooperation — the original "RP did nothing" premise is only fully met in managed deployments.</p></div></details>
+      <details class="acc"><summary>6. Cross-browser interop <span class="pill p-med">OPEN</span></summary>
+        <div class="acc-body"><p>Safari/Firefox have different (often more aggressive) storage lifetimes, but no shared revocation API exists. W3C Federated Identity WG is the venue.</p></div></details>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ CONTACT ============ -->
+<section id="contact" class="wrap">
+  <h2 class="sec">Contact & Collaboration</h2>
+  <p class="sec-sub">Interested in browser security, identity standards, or prototyping any of the above? Reach out.</p>
+  <div class="badges">
+    <span class="badge">📧 manishi.gautam@example.com</span>
+    <span class="badge">🐙 github.com/manishigautam</span>
+    <span class="badge">🔗 linkedin.com/in/manishigautam</span>
+  </div>
+</section>
+
+<footer>
+  © <span id="yr"></span> Manishi Gautam · Built with vanilla HTML/CSS/JS · Hosted on GitHub Pages
+</footer>
+
+<script>
+  // Theme toggle
+  const btn = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('theme');
+  if (saved) document.body.dataset.theme = saved;
+  syncBtn();
+  btn.addEventListener('click', () => {
+    document.body.dataset.theme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', document.body.dataset.theme);
+    syncBtn();
+  });
+  function syncBtn(){ btn.textContent = document.body.dataset.theme === 'dark' ? '☀️ Light' : '🌙 Dark'; }
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById(b.dataset.tab).classList.add('active');
+      if (b.dataset.tab === 't-threats') animateMeters();
+    });
+  });
+
+  // Animated threat meters
+  function animateMeters(){
+    document.querySelectorAll('.meter > div').forEach(m => {
+      m.style.width = '0';
+      requestAnimationFrame(() => requestAnimationFrame(() => m.style.width = m.dataset.w));
+    });
+  }
+
+  document.getElementById('yr').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
