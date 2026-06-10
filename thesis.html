@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Missing Session — Browser-Mediated Federated Session Revocation</title>
+<meta name="description" content="A complete research thesis on how a browser can revoke a relying party's authenticated client state on a trusted federated signal — the architecture, the bypasses, the fixes, and the standardization path.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- palette derived from the four problems (structure = information) ---- */
+    --ink:#0B1020;          /* background */
+    --ink-2:#0F1729;        /* panel */
+    --ink-3:#141E36;        /* raised panel */
+    --line:#26324F;         /* blueprint line */
+    --line-2:#1B2540;
+    --fg:#E8EDF9;           /* primary text */
+    --fg-2:#A6B3D0;         /* muted */
+    --fg-3:#6F7E9F;         /* fainter */
+
+    --p1:#56CCF2;  /* local state  / browser cleanup */
+    --p2:#A78BFA;  /* server validity */
+    --p3:#F5A623;  /* credential portability / crypto */
+    --p4:#4ADE80;  /* trust / authority */
+    --bad:#FF6B6B; /* residual / bypass / impossible */
+
+    --p1-dim:rgba(86,204,242,.14);
+    --p2-dim:rgba(167,139,250,.14);
+    --p3-dim:rgba(245,166,35,.14);
+    --p4-dim:rgba(74,222,128,.14);
+    --bad-dim:rgba(255,107,107,.13);
+
+    --maxw:1180px;
+    --display:"Space Grotesk",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --serif:"Source Serif 4",Georgia,serif;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  body{
+    margin:0;background:var(--ink);color:var(--fg);
+    font-family:var(--serif);font-size:18px;line-height:1.65;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 26px}
+  a{color:var(--p1);text-decoration:none}
+  a:hover{text-decoration:underline}
+  h1,h2,h3,h4{font-family:var(--display);font-weight:600;line-height:1.1;letter-spacing:-.02em}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--fg-3)}
+
+  /* blueprint grid background */
+  .grid-bg{
+    position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:
+      linear-gradient(var(--line-2) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
+    background-size:46px 46px;
+    mask-image:radial-gradient(circle at 50% 30%,#000 0%,transparent 78%);
+    -webkit-mask-image:radial-gradient(circle at 50% 30%,#000 0%,transparent 78%);
+  }
+  main{position:relative;z-index:1}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(11,16,32,.82);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+  }
+  nav .wrap{display:flex;align-items:center;gap:18px;height:60px}
+  .brand{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:var(--fg);font-weight:600;white-space:nowrap}
+  .brand b{color:var(--p4)}
+  .navlinks{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+  .navlinks a{font-family:var(--mono);font-size:12px;color:var(--fg-2);padding:7px 9px;border-radius:6px;letter-spacing:.02em}
+  .navlinks a:hover{background:var(--ink-3);color:var(--fg);text-decoration:none}
+  @media(max-width:860px){.navlinks{display:none}}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:84px 0 38px;position:relative}
+  .hero .kicker{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:100px;padding:7px 14px;font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-2)}
+  .hero .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--p4);box-shadow:0 0 12px var(--p4)}
+  .hero h1{font-size:clamp(38px,6.4vw,80px);margin:26px 0 0;font-weight:700;letter-spacing:-.035em}
+  .hero h1 .u{position:relative;white-space:nowrap}
+  .hero h1 .u::after{content:"";position:absolute;left:0;right:0;bottom:.07em;height:.10em;background:linear-gradient(90deg,var(--p3),var(--p4));border-radius:2px}
+  .hero .lede{font-size:clamp(19px,2.4vw,24px);color:var(--fg-2);max-width:760px;margin:26px 0 0;line-height:1.5}
+  .hero .lede b{color:var(--fg);font-weight:600}
+  .hero-actions{margin-top:34px;display:flex;gap:14px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:13.5px;font-weight:500;letter-spacing:.02em;padding:13px 20px;border-radius:9px;border:1px solid var(--line);background:var(--ink-3);color:var(--fg);cursor:pointer;transition:.18s;display:inline-flex;gap:9px;align-items:center}
+  .btn:hover{text-decoration:none;border-color:var(--p4);transform:translateY(-1px)}
+  .btn.primary{background:linear-gradient(180deg,#16233f,#101a30);border-color:var(--p4)}
+  .btn.primary .dot{width:8px;height:8px;border-radius:50%;background:var(--p4);box-shadow:0 0 10px var(--p4)}
+
+  .hero-meta{margin-top:46px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .hero-meta div{background:var(--ink-2);padding:16px 18px}
+  .hero-meta .n{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.02em}
+  .hero-meta .l{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-3);margin-top:3px}
+  .hero-meta .c1{color:var(--p1)}.hero-meta .c2{color:var(--p2)}.hero-meta .c3{color:var(--p3)}.hero-meta .c4{color:var(--p4)}
+  @media(max-width:680px){.hero-meta{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---------- section scaffolding ---------- */
+  section{padding:74px 0;border-top:1px solid var(--line-2)}
+  .sec-head{margin-bottom:34px}
+  .sec-head .num{font-family:var(--mono);font-size:12px;color:var(--p4);letter-spacing:.2em}
+  .sec-head h2{font-size:clamp(28px,3.6vw,44px);margin:12px 0 0;font-weight:600}
+  .sec-head p.sub{color:var(--fg-2);max-width:780px;margin:16px 0 0;font-size:19px}
+
+  p{margin:0 0 18px}
+  .lead-p{font-size:20px;color:var(--fg);max-width:820px}
+  .muted{color:var(--fg-2)}
+  strong{color:var(--fg);font-weight:600}
+  .term{border-bottom:1px dotted var(--fg-3);cursor:help}
+
+  /* panels & cards */
+  .panel{background:var(--ink-2);border:1px solid var(--line);border-radius:14px;padding:26px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+
+  .card{background:var(--ink-2);border:1px solid var(--line);border-radius:13px;padding:22px;position:relative;overflow:hidden}
+  .card .tag{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  .card h3{font-size:21px;margin:12px 0 8px}
+  .card p{font-size:16px;color:var(--fg-2);margin:0}
+  .card .edge{position:absolute;left:0;top:0;bottom:0;width:4px}
+
+  .pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;padding:4px 10px;border-radius:100px;border:1px solid var(--line);color:var(--fg-2)}
+  .pill .d{width:7px;height:7px;border-radius:50%}
+
+  /* problem legend chips */
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 28px}
+  .chip{font-family:var(--mono);font-size:12px;padding:8px 13px;border-radius:8px;border:1px solid var(--line);display:flex;gap:8px;align-items:center;background:var(--ink-2)}
+  .chip .sq{width:10px;height:10px;border-radius:3px}
+
+  /* tables */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;font-family:var(--mono);min-width:640px}
+  th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line-2);vertical-align:top;line-height:1.45}
+  th{background:var(--ink-3);color:var(--fg);font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase;position:sticky;top:0}
+  tr:last-child td{border-bottom:none}
+  td.good{color:var(--p4)}td.bad{color:var(--bad)}td.warn{color:var(--p3)}
+  .yes{color:var(--p4)}.no{color:var(--bad)}.part{color:var(--p3)}
+
+  /* ===== SIGNATURE: the revocation console ===== */
+  .console{background:linear-gradient(180deg,#0e1730,#0b1224);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 30px 80px -40px rgba(0,0,0,.8)}
+  .console-top{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);background:rgba(20,30,54,.6)}
+  .console-top .lamp{width:11px;height:11px;border-radius:50%;background:var(--bad);box-shadow:0 0 10px var(--bad)}
+  .console-top .lamp.live{background:var(--p4);box-shadow:0 0 12px var(--p4)}
+  .console-top .title{font-family:var(--mono);font-size:13px;letter-spacing:.04em;color:var(--fg)}
+  .console-top .status{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--fg-2)}
+  .console-body{display:grid;grid-template-columns:1.15fr .85fr;gap:0}
+  @media(max-width:900px){.console-body{grid-template-columns:1fr}}
+  .console-left{padding:24px;border-right:1px solid var(--line)}
+  @media(max-width:900px){.console-left{border-right:none;border-bottom:1px solid var(--line)}}
+  .console-right{padding:24px;background:rgba(8,12,24,.4)}
+
+  .stage-label{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-3);margin-bottom:14px}
+
+  /* the pipeline */
+  .pipe{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+  .step{display:flex;gap:13px;align-items:flex-start;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--ink-2);opacity:.45;transition:.35s}
+  .step.active{opacity:1;border-color:var(--p4);box-shadow:0 0 0 1px var(--p4) inset,0 8px 30px -18px var(--p4)}
+  .step.done{opacity:.9;border-color:var(--line)}
+  .step .ix{font-family:var(--mono);font-size:12px;color:var(--p4);width:20px;flex:none;padding-top:2px}
+  .step .st-t{font-family:var(--display);font-size:15px;font-weight:600}
+  .step .st-d{font-size:13.5px;color:var(--fg-2);font-family:var(--serif);line-height:1.45;margin-top:2px}
+  .step .chk{margin-left:auto;font-family:var(--mono);font-size:14px;color:var(--p4);opacity:0;transition:.3s}
+  .step.done .chk{opacity:1}
+
+  /* surfaces grid */
+  .surfaces{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:520px){.surfaces{grid-template-columns:repeat(3,1fr)}}
+  .surf{border:1px solid var(--line);border-radius:8px;padding:9px 8px;text-align:center;background:var(--ink-2);transition:.4s;position:relative}
+  .surf .sn{font-family:var(--mono);font-size:10.5px;color:var(--fg);letter-spacing:.01em;line-height:1.2}
+  .surf .ss{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;margin-top:5px;color:var(--p1)}
+  .surf.alive{border-color:rgba(86,204,242,.5);background:var(--p1-dim)}
+  .surf.alive .ss{color:var(--p1)}
+  .surf.purged{opacity:.3;border-style:dashed}
+  .surf.purged .ss{color:var(--fg-3)}
+  .surf.purged .ss::before{content:"× "}
+  .surf.resist{border-color:rgba(255,107,107,.55);background:var(--bad-dim)}
+  .surf.resist .ss{color:var(--bad)}
+
+  .console-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+  .big-btn{font-family:var(--mono);font-weight:600;font-size:14px;letter-spacing:.03em;padding:15px 22px;border-radius:11px;border:1px solid var(--p4);background:linear-gradient(180deg,#173a2b,#0f2a20);color:#d8ffe9;cursor:pointer;transition:.18s;display:inline-flex;gap:10px;align-items:center}
+  .big-btn:hover{transform:translateY(-1px);box-shadow:0 14px 40px -18px var(--p4)}
+  .big-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+  .big-btn .pulse{width:9px;height:9px;border-radius:50%;background:var(--p4);box-shadow:0 0 0 0 var(--p4);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,222,128,.6)}70%{box-shadow:0 0 0 9px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+  .ghost-btn{font-family:var(--mono);font-size:13px;padding:15px 18px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--fg-2);cursor:pointer}
+  .ghost-btn:hover{color:var(--fg);border-color:var(--fg-3)}
+
+  /* toggles */
+  .toggles{display:flex;flex-direction:column;gap:11px;margin:4px 0 20px}
+  .tog{display:flex;align-items:center;gap:13px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--ink-2);cursor:pointer;transition:.2s}
+  .tog:hover{border-color:var(--fg-3)}
+  .tog .sw{width:40px;height:23px;border-radius:100px;background:var(--ink-3);border:1px solid var(--line);position:relative;flex:none;transition:.2s}
+  .tog .sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--fg-3);transition:.2s}
+  .tog.on .sw{background:rgba(74,222,128,.25);border-color:var(--p4)}
+  .tog.on .sw::after{left:19px;background:var(--p4)}
+  .tog.locked{opacity:.7;cursor:not-allowed}
+  .tog.locked .sw{background:rgba(86,204,242,.2);border-color:var(--p1)}
+  .tog.locked .sw::after{left:19px;background:var(--p1)}
+  .tog .tt{font-family:var(--display);font-size:14.5px;font-weight:600}
+  .tog .td{font-family:var(--mono);font-size:11px;color:var(--fg-3);margin-top:1px}
+
+  /* bypass matrix */
+  .bypass{display:flex;flex-direction:column;gap:8px}
+  .bp{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px 14px;border:1px solid var(--line);border-radius:9px;background:var(--ink-2);transition:.3s}
+  .bp .bp-t{font-family:var(--mono);font-size:12.5px;color:var(--fg)}
+  .bp .bp-s{font-family:var(--mono);font-size:11px;color:var(--fg-3);margin-top:2px}
+  .bp .verdict{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;padding:5px 11px;border-radius:100px;white-space:nowrap}
+  .bp.killed{border-color:rgba(74,222,128,.4)}
+  .bp.killed .verdict{background:var(--p4-dim);color:var(--p4)}
+  .bp.survives{border-color:rgba(255,107,107,.4)}
+  .bp.survives .verdict{background:var(--bad-dim);color:var(--bad)}
+  .bp.partial{border-color:rgba(245,166,35,.4)}
+  .bp.partial .verdict{background:var(--p3-dim);color:var(--p3)}
+
+  .verdict-line{font-family:var(--mono);font-size:12.5px;color:var(--fg-2);margin-top:16px;padding:13px 15px;border-radius:9px;border:1px dashed var(--line);background:var(--ink-2);line-height:1.55}
+  .verdict-line b{color:var(--fg)}
+
+  /* view toggle (simple/complex) */
+  .viewtoggle{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;font-family:var(--mono);font-size:12px}
+  .viewtoggle button{padding:9px 16px;background:transparent;color:var(--fg-2);border:none;cursor:pointer;letter-spacing:.04em}
+  .viewtoggle button.on{background:var(--ink-3);color:var(--fg)}
+  .view{display:none}.view.show{display:block;animation:fade .3s}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* svg diagram styling */
+  .svgbox{border:1px solid var(--line);border-radius:14px;background:radial-gradient(circle at 50% 0%,#101a30,#0b1122);padding:8px;overflow-x:auto}
+  svg{display:block;width:100%;height:auto}
+  .svg-cap{font-family:var(--mono);font-size:12px;color:var(--fg-3);margin-top:12px;text-align:center}
+  .lbl{font-family:var(--mono);font-size:12px;fill:var(--fg)}
+  .lbl-s{font-family:var(--mono);font-size:10px;fill:var(--fg-3)}
+  .lbl-t{font-family:var(--display);font-size:14px;font-weight:600;fill:var(--fg)}
+
+  /* layered architecture stack */
+  .stack{display:flex;flex-direction:column;gap:10px}
+  .layer{border:1px solid var(--line);border-left-width:4px;border-radius:11px;padding:18px 20px;background:var(--ink-2);display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center}
+  .layer .lz{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.7}
+  .layer h4{font-size:18px;margin:0 0 4px}
+  .layer p{font-size:15px;color:var(--fg-2);margin:0;font-family:var(--serif)}
+  .layer .own{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:100px;border:1px solid var(--line);color:var(--fg-2);white-space:nowrap}
+  @media(max-width:680px){.layer{grid-template-columns:1fr}.layer .lz{writing-mode:horizontal-tb;transform:none}}
+
+  /* problem-owner verdict columns */
+  .verdicts3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:820px){.verdicts3{grid-template-columns:1fr}}
+  .vcol{border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  .vcol .vh{padding:14px 18px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+  .vcol ul{list-style:none;margin:0;padding:14px 18px;font-size:15px;color:var(--fg-2);font-family:var(--serif)}
+  .vcol li{padding:7px 0;border-bottom:1px solid var(--line-2);display:flex;gap:9px}
+  .vcol li:last-child{border-bottom:none}
+  .vcol li::before{content:"▸";flex:none}
+  .vcol.now .vh{color:var(--p4)}.vcol.now li::before{color:var(--p4)}
+  .vcol.coop .vh{color:var(--p3)}.vcol.coop li::before{color:var(--p3)}
+  .vcol.imposs .vh{color:var(--bad)}.vcol.imposs li::before{color:var(--bad)}
+
+  /* roadmap */
+  .road{position:relative;padding-left:30px}
+  .road::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--p4),var(--p3),var(--p2))}
+  .road-item{position:relative;margin-bottom:26px}
+  .road-item::before{content:"";position:absolute;left:-26px;top:5px;width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid var(--p4)}
+  .road-item h4{font-size:18px;margin:0 0 5px}
+  .road-item .when{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--p4)}
+  .road-item p{font-size:15px;color:var(--fg-2);margin:6px 0 0}
+
+  /* callout */
+  .callout{border:1px solid var(--line);border-left:4px solid var(--p3);border-radius:12px;padding:20px 24px;background:linear-gradient(90deg,var(--p3-dim),transparent);margin:24px 0}
+  .callout .ct{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--p3);margin-bottom:8px}
+  .callout p{margin:0;font-size:17px}
+  .callout.bad{border-left-color:var(--bad);background:linear-gradient(90deg,var(--bad-dim),transparent)}
+  .callout.bad .ct{color:var(--bad)}
+  .callout.good{border-left-color:var(--p4);background:linear-gradient(90deg,var(--p4-dim),transparent)}
+  .callout.good .ct{color:var(--p4)}
+
+  .thesis-quote{font-family:var(--display);font-size:clamp(24px,3.6vw,40px);font-weight:600;letter-spacing:-.02em;line-height:1.18;max-width:920px;margin:0}
+  .thesis-quote .hl{background:linear-gradient(120deg,var(--p3),var(--p4));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+  footer{border-top:1px solid var(--line);padding:54px 0 70px;margin-top:30px}
+  footer .grid2{align-items:start}
+  .epi{font-family:var(--mono);font-size:12px;color:var(--fg-3);line-height:1.7}
+  .epi b{color:var(--fg-2)}
+  .badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+  /* tooltips for epistemic tags */
+  .etag{font-family:var(--mono);font-size:10px;letter-spacing:.05em;padding:2px 6px;border-radius:5px;border:1px solid var(--line);vertical-align:middle;margin-left:4px}
+  .etag.fact{color:var(--p4);border-color:rgba(74,222,128,.4)}
+  .etag.inf{color:var(--p1);border-color:rgba(86,204,242,.4)}
+  .etag.spec{color:var(--p3);border-color:rgba(245,166,35,.4)}
+  .etag.prop{color:var(--p2);border-color:rgba(167,139,250,.4)}
+
+  .small{font-size:14px}
+  .hr{height:1px;background:var(--line-2);border:none;margin:30px 0}
+  ::selection{background:rgba(74,222,128,.3)}
+  .anchor{position:relative;top:-70px;visibility:hidden}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav>
+  <div class="wrap">
+    <span class="brand">THE&nbsp;MISSING&nbsp;<b>SESSION</b></span>
+    <div class="navlinks">
+      <a href="#console">Console</a>
+      <a href="#problem">Problem</a>
+      <a href="#surfaces">Surfaces</a>
+      <a href="#bypass">Bypasses</a>
+      <a href="#mapping">Where it lives</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#flow">Flow</a>
+      <a href="#crypto">Crypto</a>
+      <a href="#standards">Governance</a>
+      <a href="#ideal">Ideal</a>
+      <a href="#verdicts">Verdicts</a>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker"><span class="dot"></span>Browser-Mediated Federated Session Revocation · Research Thesis</span>
+    <h1>Can a browser <span class="u">end a session</span> a website refuses to end?</h1>
+    <p class="lede">When you click <b>"log out everywhere,"</b> the identity provider ends its own session — and the website you logged into keeps treating you as signed in, sometimes forever. This is the complete map of why that happens, what the browser can and cannot do about it, every way the fix can be bypassed, and the architecture that would make logout an <b>enforceable property</b> instead of a website's courtesy.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#console"><span class="dot"></span>Run the revocation console</a>
+      <a class="btn" href="#problem">Read the thesis</a>
+    </div>
+    <div class="hero-meta">
+      <div><div class="n c1">4</div><div class="l">Core problems</div></div>
+      <div><div class="n c2">15+</div><div class="l">State surfaces</div></div>
+      <div><div class="n c3">30</div><div class="l">Architectures mapped</div></div>
+      <div><div class="n c4">1</div><div class="l">Missing primitive</div></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ CONSOLE (signature) ============ -->
+<section id="console">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">00 · LIVE DEMONSTRATION</div>
+      <h2>The revocation console</h2>
+      <p class="sub">Press one button. Watch the trusted signal propagate through the browser, destroy the relying party's client state, and then — the honest part — watch which copy-and-replay attacks <em>survive</em> anyway. Toggle the defense layers and the five attack cases flip in real time. This single panel is the entire thesis.</p>
+    </div>
+
+    <div class="console">
+      <div class="console-top">
+        <span class="lamp" id="lamp"></span>
+        <span class="title">session://abc.com &nbsp;·&nbsp; account:&nbsp;ada@idp.example</span>
+        <span class="status" id="constatus">STATUS: AUTHENTICATED</span>
+      </div>
+      <div class="console-body">
+
+        <!-- LEFT: pipeline + surfaces -->
+        <div class="console-left">
+          <div class="stage-label">Enforcement pipeline — ordered teardown</div>
+          <div class="pipe" id="pipe">
+            <div class="step" data-i="1"><span class="ix">1</span><div><div class="st-t">Verify &amp; authorize</div><div class="st-d">Check signed signal against the IdP's keys; confirm a grant binds this IdP to abc.com.</div></div><span class="chk">✓</span></div>
+            <div class="step" data-i="2"><span class="ix">2</span><div><div class="st-t">Gate re-authentication</div><div class="st-d">Revoke the FedCM grant, set login-status = logged-out, clear auto-reauth — so nothing silently logs back in.</div></div><span class="chk">✓</span></div>
+            <div class="step" data-i="3"><span class="ix">3</span><div><div class="st-t">Kill live state first</div><div class="st-d">Terminate service workers, cancel in-flight requests, flush sockets &amp; HTTP/2&nbsp;sessions.</div></div><span class="chk">✓</span></div>
+            <div class="step" data-i="4"><span class="ix">4</span><div><div class="st-t">Destroy / crypto-erase</div><div class="st-d">Purge every StorageKey + all cookie partitions; where session-keyed, destroy the key.</div></div><span class="chk">✓</span></div>
+            <div class="step" data-i="5"><span class="ix">5</span><div><div class="st-t">Tear down contexts</div><div class="st-d">Navigate/destroy live tabs, evict bfcache &amp; prerender — evict in-memory tokens.</div></div><span class="chk">✓</span></div>
+            <div class="step" data-i="6"><span class="ix">6</span><div><div class="st-t">Verify &amp; attest</div><div class="st-d">Confirm no service worker re-registered; journal completion; issue receipt.</div></div><span class="chk">✓</span></div>
+          </div>
+
+          <div class="stage-label">Client state surfaces for <span class="mono">abc.com</span></div>
+          <div class="surfaces" id="surfaces">
+            <div class="surf alive"><div class="sn">Cookies</div><div class="ss">alive</div></div>
+            <div class="surf alive"><div class="sn">HttpOnly</div><div class="ss">alive</div></div>
+            <div class="surf alive"><div class="sn">localStorage</div><div class="ss">alive</div></div>
+            <div class="surf alive"><div class="sn">IndexedDB</div><div class="ss">alive</div></div>
+            <div class="surf alive"><div class="sn">Cache&nbsp;API</div><div class="ss">alive</div></div>
+            <div class="surf alive"><div class="sn">Service&nbsp;Worker</div><div class="ss">alive</div></div>
+            <div class="surf alive"><div class="sn">HTTP&nbsp;cache</div><div class="ss">alive</div></div>
+            <div class="surf alive" data-mem="1"><div class="sn">Tab&nbsp;memory</div><div class="ss">alive</div></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: layers + bypass -->
+        <div class="console-right">
+          <div class="stage-label">Defense layers — toggle to see coverage</div>
+          <div class="toggles">
+            <div class="tog locked" title="The browser floor is always on in this model"><div class="sw"></div><div><div class="tt">Browser cleanup <span class="mono" style="color:var(--p1)">· floor</span></div><div class="td">always on · destroys local client state</div></div></div>
+            <div class="tog" id="togDbsc"><div class="sw"></div><div><div class="tt">DBSC device binding <span class="mono" style="color:var(--p3)">· anti-theft</span></div><div class="td">requires RP adoption · copies die off-device</div></div></div>
+            <div class="tog" id="togCaep"><div class="sw"></div><div><div class="tt">CAEP server revocation <span class="mono" style="color:var(--p2)">· validity</span></div><div class="td">requires RP receiver · kills the value at the server</div></div></div>
+          </div>
+
+          <div class="stage-label">Copy-and-replay: does the stolen <span class="mono">session_id</span> still work?</div>
+          <div class="bypass" id="bypass">
+            <div class="bp" data-case="smsb"><div><div class="bp-t">Same machine · same browser</div><div class="bp-s">copy → replay in another tab/profile</div></div><span class="verdict">—</span></div>
+            <div class="bp" data-case="smdb"><div><div class="bp-t">Same machine · different browser</div><div class="bp-s">Chrome → Firefox replay</div></div><span class="verdict">—</span></div>
+            <div class="bp" data-case="dmsb"><div><div class="bp-t">Different machine · same browser</div><div class="bp-s">exported cookie jar, replayed</div></div><span class="verdict">—</span></div>
+            <div class="bp" data-case="dmdb"><div><div class="bp-t">Different machine · different browser</div><div class="bp-s">raw token replayed from a script</div></div><span class="verdict">—</span></div>
+            <div class="bp" data-case="mem"><div><div class="bp-t">Token already in tab memory</div><div class="bp-s">read into JS heap before revocation</div></div><span class="verdict">—</span></div>
+          </div>
+          <div class="verdict-line" id="vline"></div>
+
+          <div class="console-cta" style="margin-top:18px">
+            <button class="big-btn" id="revoke"><span class="pulse"></span>Revoke everywhere</button>
+            <button class="ghost-btn" id="reset">Reset</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <p class="svg-cap">A simulation for understanding, not a live browser. The verdicts encode the real coverage analysis from the thesis: browser purge alone is a floor; only device binding + server revocation reach copied credentials.</p>
+  </div>
+</section>
+
+<!-- ============ PROBLEM ============ -->
+<section id="problem">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">01 · PROBLEM DECOMPOSITION</div>
+      <h2>"Session revocation" is four problems wearing one coat</h2>
+      <p class="sub">Almost every failed "log out everywhere" is a category error — solving one of these and claiming the others came free. Keeping them separate is the single most important move in the whole research.</p>
+    </div>
+
+    <div class="legend">
+      <div class="chip"><span class="sq" style="background:var(--p1)"></span>P1 · Local state</div>
+      <div class="chip"><span class="sq" style="background:var(--p2)"></span>P2 · Server validity</div>
+      <div class="chip"><span class="sq" style="background:var(--p3)"></span>P3 · Portability</div>
+      <div class="chip"><span class="sq" style="background:var(--p4)"></span>P4 · Trust &amp; authority</div>
+      <div class="chip"><span class="sq" style="background:var(--bad)"></span>Residual / impossible</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><span class="edge" style="background:var(--p1)"></span>
+        <span class="tag" style="color:var(--p1)">P1 · Browser-owned · solvable</span>
+        <h3>Local stale state</h3>
+        <p>The website's cookies, stored tokens, service-worker caches and in-memory credentials persist in <em>this</em> browser and keep the session usable here — even if the site never wired up logout. This is the part the browser can actually enforce.</p>
+      </div>
+      <div class="card"><span class="edge" style="background:var(--p2)"></span>
+        <span class="tag" style="color:var(--p2)">P2 · Server-owned · not browser-solvable</span>
+        <h3>Credential validity</h3>
+        <p>The website's backend still honors the token it issued, regardless of client state. No amount of deletion changes what a server chooses to accept. Only the validator can revoke validity.</p>
+      </div>
+      <div class="card"><span class="edge" style="background:var(--p3)"></span>
+        <span class="tag" style="color:var(--p3)">P3 · Crypto-owned · binding only</span>
+        <h3>Credential portability</h3>
+        <p>The credential may have been copied off-device <em>before</em> revocation, somewhere no cleanup can reach. Only cryptographic binding (DBSC, DPoP) makes a copy worthless. Deletion is powerless here — by construction.</p>
+      </div>
+      <div class="card"><span class="edge" style="background:var(--p4)"></span>
+        <span class="tag" style="color:var(--p4)">P4 · The open problem</span>
+        <h3>Trust &amp; authority of the signal</h3>
+        <p>Who may order the browser to destroy an origin's state, scoped and authenticated how? Plus <strong>P4a</strong>: if the IdP's own session survives, the site silently logs the user back in seconds later — undoing everything.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="ct">The trap this avoids</div>
+      <p>"Delete the cookie" solves a sliver of <strong style="color:var(--p1)">P1</strong> and is routinely sold as if it solved <strong style="color:var(--p2)">P2</strong> and <strong style="color:var(--p3)">P3</strong> too. It does not. A complete architecture assigns each problem to a layer and never lets one layer claim another's territory.</p>
+    </div>
+
+    <h3 style="font-size:22px;margin:38px 0 16px">First-principles: why logout is many actions, not one</h3>
+    <p class="muted">Authenticated state is distributed across independent owners. The <strong>browser</strong> owns client storage; the <strong>relying party</strong> (the site you log into, e.g. <span class="mono">abc.com</span>) owns its server session and decides what its tokens mean; the <strong>identity provider</strong> (Google, Okta, Apple…) owns its single-sign-on session and the federation grant. "Logout" can mean deleting a cookie, clearing stored tokens, killing a server session, revoking OAuth tokens, ending the IdP session, tearing down live tabs — or, very commonly, <strong style="color:var(--bad)">nothing but a UI change</strong> while every credential stays valid. No current standard orchestrates all of it.</p>
+  </div>
+</section>
+
+<!-- ============ SURFACES ============ -->
+<section id="surfaces">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">02 · STATE DISCOVERY</div>
+      <h2>Everywhere a session can hide</h2>
+      <p class="sub">You cannot revoke what you cannot find. A session is not "a cookie" — it is a lineage of artifacts scattered across a dozen surfaces, most of which the browser can delete but none of which it can label by account.</p>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <div class="viewtoggle" data-group="surf">
+        <button class="on" data-v="simple">Simple view</button>
+        <button data-v="complex">Complex view</button>
+      </div>
+    </div>
+
+    <!-- SIMPLE -->
+    <div class="view show" data-view="surf-simple">
+      <div class="grid3">
+        <div class="card"><span class="edge" style="background:var(--p4)"></span><span class="tag" style="color:var(--p4)">Browser CAN destroy reliably</span><h3>Persistent surfaces</h3><p>Cookies (incl. HttpOnly), localStorage, IndexedDB, Cache Storage, service-worker registrations &amp; caches, HTTP cache. All deletable by origin / StorageKey — but <strong>never by account</strong>.</p></div>
+        <div class="card"><span class="edge" style="background:var(--p3)"></span><span class="tag" style="color:var(--p3)">Only by destroying the context</span><h3>Live surfaces</h3><p>JS / WASM heap, in-flight requests, running service &amp; shared workers, bfcache, prerender. There is <strong>no heap scrub</strong> — the only eviction is reload / navigate / kill the tab.</p></div>
+        <div class="card"><span class="edge" style="background:var(--bad)"></span><span class="tag" style="color:var(--bad)">Out of reach</span><h3>Escaped surfaces</h3><p>Anything <strong>copied off-device</strong>, and <strong>extension storage</strong>. Once bytes leave the browser's jurisdiction, deletion is meaningless. This is the hard ceiling.</p></div>
+      </div>
+      <div class="callout good" style="margin-top:22px">
+        <div class="ct">The one bright spot</div>
+        <p>The browser already owns a few <strong>per-account</strong> objects — passkeys, FedCM grants, DBSC keys, the profile/container boundary. They are the scattered embryos of a session registry that nobody has yet unified.</p>
+      </div>
+    </div>
+
+    <!-- COMPLEX -->
+    <div class="view" data-view="surf-complex">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Surface</th><th>What it stores</th><th>Per&#8209;origin?</th><th>Per&#8209;account?</th><th>Survives reload</th><th>Survives copy/theft</th><th>Missing info</th></tr></thead>
+          <tbody>
+            <tr><td>Cookies / HttpOnly</td><td>session IDs, tokens</td><td class="warn">eTLD+1</td><td class="bad">no</td><td>yes</td><td class="bad">yes</td><td>a label: "∈ session S of account A"</td></tr>
+            <tr><td>Partitioned / CHIPS</td><td>embedded sessions</td><td class="good">per partition</td><td class="bad">no</td><td>yes</td><td class="bad">yes</td><td>same label</td></tr>
+            <tr><td>localStorage</td><td>SPA access/refresh tokens</td><td class="good">yes</td><td class="bad">no</td><td>yes</td><td class="bad">yes (if exported)</td><td>write-time ownership tag</td></tr>
+            <tr><td>sessionStorage</td><td>per-tab tokens</td><td class="warn">tab namespace</td><td class="bad">no</td><td>yes (same tab)</td><td class="bad">yes</td><td>namespace ↔ session map</td></tr>
+            <tr><td>IndexedDB</td><td>offline tokens, blobs <span class="mono" style="color:var(--fg-3)">(Supabase, Firebase)</span></td><td class="good">yes</td><td class="bad">no</td><td>yes</td><td class="bad">yes (if exported)</td><td>ownership metadata per DB</td></tr>
+            <tr><td>Cache Storage</td><td>authed responses</td><td class="good">yes</td><td class="bad">no</td><td>yes</td><td class="bad">yes</td><td>which caches are session-derived</td></tr>
+            <tr><td>Service workers</td><td>interceptor + caches</td><td class="good">per scope</td><td class="bad">no</td><td class="bad">yes — can resurrect</td><td class="warn">caches yes</td><td>which registration serves which session</td></tr>
+            <tr><td>HTTP cache</td><td>authed responses</td><td class="warn">per NIK</td><td class="bad">no</td><td>yes</td><td class="bad">yes</td><td>auth-derived vs public</td></tr>
+            <tr><td>JS / WASM heap</td><td>live tokens</td><td class="warn">per context</td><td class="bad">no</td><td class="good">no (gone on reload)</td><td class="warn">only if dumped</td><td>any handle at all — heaps are unlabeled</td></tr>
+            <tr><td>Shared/Broadcast</td><td>live cross-tab state</td><td class="good">yes</td><td class="bad">no</td><td>partial</td><td class="good">no</td><td>session linkage</td></tr>
+            <tr><td>bfcache / prerender</td><td>frozen live pages</td><td class="good">per entry</td><td class="bad">no</td><td class="bad">restores live page</td><td class="good">no</td><td>whether entry is authed</td></tr>
+            <tr><td>Extension storage</td><td>copied tokens</td><td class="bad">no</td><td class="bad">no</td><td>yes</td><td class="bad">yes</td><td>out of web jurisdiction</td></tr>
+            <tr><td>Passkeys</td><td>WebAuthn creds</td><td class="good">RP ID</td><td class="good">YES</td><td>yes</td><td class="good">non-exportable</td><td>they prove identity, don't carry the session</td></tr>
+            <tr><td>FedCM grants</td><td>(RP, IdP, account)</td><td class="good">yes</td><td class="good">YES</td><td>yes</td><td>n/a</td><td>coverage — FedCM logins only</td></tr>
+            <tr><td>DBSC key store</td><td>device-bound key</td><td class="good">yes</td><td class="good">per session</td><td>yes</td><td class="good">non-exportable</td><td>RP adoption</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="svg-cap">Two columns carry the whole argument: <span style="color:var(--bad)">per-account = "no"</span> almost everywhere, and the rightmost column is a list of primitives the platform never built.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SESSION IDENTITY ============ -->
+<section id="identity">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">03 · SESSION IDENTITY</div>
+      <h2>What <em>is</em> a session, really?</h2>
+    </div>
+    <p class="lead-p">A session is <strong>a server-side belief, projected onto client artifacts.</strong> The server believes "bearer of X is account A until time T." The client merely holds X. Nothing in the web platform reifies that belief as an object. The platform has <em>storage</em>, <em>credentials</em>, and <em>requests</em> — it has no first-class <strong>Session</strong>.</p>
+
+    <div class="callout">
+      <div class="ct">The true identity of a session</div>
+      <p class="mono" style="font-size:15px;line-height:1.7">SessionID := ( RP&nbsp;origin , account&nbsp;A , IdP&nbsp;issuer , issuance&nbsp;event&nbsp;e , lineage&nbsp;L )</p>
+      <p class="small muted" style="margin-top:10px">…where lineage <strong>L</strong> is the set of artifacts derived from issuance event <strong>e</strong>: the Set-Cookie that followed the token exchange, the localStorage writes the login page made, the caches it populated, the in-memory copies in live tabs.</p>
+    </div>
+
+    <p class="muted">Session identity is <strong>capturable at exactly one moment</strong> — the login event — and <strong>trackable afterward only if writes are labeled</strong>. The browser can <em>discover</em> it today only for FedCM logins; it can <em>infer</em> it from the OAuth redirect dance and the Set-Cookie that follows; it cannot <em>track</em> or <em>represent</em> it because writes are unlabeled and no Session object exists. Every architecture later in this thesis is a different answer to: <em>how do we capture the moment, and how do we label the lineage?</em></p>
+  </div>
+</section>
+
+<!-- ============ EXISTING MECHANISMS ============ -->
+<section id="existing">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">04 · PRIOR ART</div>
+      <h2>What exists, and exactly where each one stops</h2>
+      <p class="sub">Every building block already ships. None does the whole job. Read the rightmost column as the gap each mechanism leaves for the next.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Mechanism</th><th>Solves</th><th>Needs</th><th>Floor / Bridge / Real</th></tr></thead>
+        <tbody>
+          <tr><td>Clear-Site-Data</td><td>full client-state purge for one origin</td><td class="warn">RP sends the header</td><td>destruction engine (reuse it)</td></tr>
+          <tr><td>RP-Initiated Logout</td><td>ends the IdP session the RP started</td><td class="warn">RP</td><td>bridge</td></tr>
+          <tr><td>Front-Channel Logout</td><td>multi-RP browser logout (in theory)</td><td class="warn">RP + 3p cookies</td><td class="bad">eroding / cosmetic</td></tr>
+          <tr><td>Back-Channel Logout</td><td>server session invalidation (P2)</td><td class="warn">RP</td><td>server-side, client-blind</td></tr>
+          <tr><td>FedCM disconnect / Login Status</td><td>browser-held federation grant — the trust anchor</td><td class="warn">RP used FedCM</td><td>foundation, not enforcement</td></tr>
+          <tr><td>CAEP / Shared Signals / SET</td><td>near-real-time server revocation (P2)</td><td class="warn">IdP + RP servers</td><td>real for P2 · <strong style="color:var(--bad)">no browser receiver</strong></td></tr>
+          <tr><td>DBSC</td><td>credential portability (P3) — anti-theft</td><td class="warn">RP adoption</td><td class="good">real anti-theft layer</td></tr>
+          <tr><td>Enterprise policy</td><td>trust provisioning + mandated enforcement</td><td class="good">admin only</td><td class="good">best near-term deployment</td></tr>
+          <tr><td>Profiles / containers</td><td>per-account isolation (P5) by prevention</td><td class="good">user only</td><td class="good">real, by prevention</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="svg-cap"><span class="etag fact">FACT</span> rows reflect shipped behavior &amp; current specs · version-sensitive items (FedCM features, DBSC rollout) move quickly — verify before relying.</p>
+  </div>
+</section>
+
+<!-- ============ BYPASS ============ -->
+<section id="bypass">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">05 · BYPASS &amp; FAILURE ANALYSIS</div>
+      <h2>The uncomfortable part: copy-and-replay</h2>
+      <p class="sub">The question that breaks naïve designs: someone copies the <span class="mono">session_id</span> and replays it after you purge. Here is exactly what survives, in each location, and which layer is the only thing that stops it.</p>
+    </div>
+
+    <div class="grid2" style="align-items:start">
+      <div class="panel">
+        <div class="stage-label">Does browser purge stop the replay?</div>
+        <div class="tbl-wrap" style="border:none">
+          <table style="min-width:0">
+            <thead><tr><th>Where the copy is replayed</th><th>Purge stops it?</th></tr></thead>
+            <tbody>
+              <tr><td>Same machine · same browser · same profile</td><td class="part">sometimes</td></tr>
+              <tr><td>Same machine · same browser · other profile</td><td class="no">no</td></tr>
+              <tr><td>Same machine · different browser</td><td class="no">no</td></tr>
+              <tr><td>Different machine · same browser</td><td class="no">no</td></tr>
+              <tr><td>Different machine · different browser</td><td class="no">no</td></tr>
+              <tr><td>Token already read into tab memory</td><td class="no">no</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted" style="margin-top:14px">Stated plainly: once a <span class="mono">session_id</span> value is copied anywhere, browser-side purge is powerless against the copy in <strong>4 of 5</strong> location cases, and only partial in the 5th. This is problem <strong style="color:var(--p3)">P3</strong> — and it is <strong style="color:var(--bad)">impossible</strong> to fix by deletion, because the copy lives outside the deleting browser's jurisdiction.</p>
+      </div>
+
+      <div class="panel">
+        <div class="stage-label">The only three things that actually defeat a copied id</div>
+        <div class="stack">
+          <div class="layer" style="border-left-color:var(--p3)"><div></div><div><h4 style="color:var(--p3)">1 · Make the value worthless when copied</h4><p>DBSC / DPoP bind the session to a hardware key that never leaves the original machine. A copied id presented from a different browser, machine or profile <strong>fails at the server</strong> — the only mechanism covering the cross-browser and cross-device cases.</p></div><div></div></div>
+          <div class="layer" style="border-left-color:var(--p2)"><div></div><div><h4 style="color:var(--p2)">2 · Make the server stop honoring it</h4><p>CAEP / server-side revocation kills the value at the validation point. Reaches <strong>every</strong> case, because it doesn't care where the copy physically sits.</p></div><div></div></div>
+          <div class="layer" style="border-left-color:var(--p1)"><div></div><div><h4 style="color:var(--p1)">3 · Crypto-erase the at-rest copy <span class="etag spec">SPEC</span></h4><p>If the stored artifact was encrypted under a session key held in hardware, a copied <em>ciphertext</em> is inert once the key is destroyed. Protects copies of stored data — not a token already read into plaintext.</p></div><div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout bad" style="margin-top:24px">
+      <div class="ct">Why the layering is mandatory, not decorative</div>
+      <p>This is the proof. Browser purge is a <strong>floor</strong>. The recommendation was never "purge alone" — it was anti-theft (DBSC) + validity (CAEP) + cleanup (purge), layered, because the bypass table shows purge alone leaving most of the grid red. Go back to the <a href="#console">console</a> and toggle the layers: the five cases flip from red to green exactly as this section predicts.</p>
+    </div>
+
+    <h3 style="font-size:22px;margin:38px 0 16px">Other realistic failure modes</h3>
+    <div class="grid3">
+      <div class="card small"><span class="edge" style="background:var(--p3)"></span><h3 style="font-size:17px">Service-worker resurrection</h3><p>A running worker re-creates state or re-registers after a wipe. Fix: terminate running versions + unregister + <em>re-verify</em> no re-registration before any user gesture. <span style="color:var(--p3)">Reduced.</span></p></div>
+      <div class="card small"><span class="edge" style="background:var(--p3)"></span><h3 style="font-size:17px">In-memory tokens</h3><p>A live tab holding a token in its heap keeps calling the API after storage is wiped. Fix: destroy the execution context. <span style="color:var(--p3)">Reduced; sub-second race remains.</span></p></div>
+      <div class="card small"><span class="edge" style="background:var(--p4)"></span><h3 style="font-size:17px">Re-login undo (P4a)</h3><p>The page reloads and the still-live IdP session silently signs the user back in. Fix: clear auto-reauth <em>and</em> end the IdP session. <span style="color:var(--bad)">Mandatory or the whole thing is cosmetic.</span></p></div>
+      <div class="card small"><span class="edge" style="background:var(--p4)"></span><h3 style="font-size:17px">Spoofed / replayed signal</h3><p>Forged or resent instruction. Fix: signature + binding gate + unique-id cache + monotonic serials. <span style="color:var(--p4)">Prevented.</span></p></div>
+      <div class="card small"><span class="edge" style="background:var(--p1)"></span><h3 style="font-size:17px">Async deletion race</h3><p>An in-flight request completes before deletion lands. Fix: ordered teardown + block new origin requests until purge confirms. <span style="color:var(--p3)">Reduced to sub-second.</span></p></div>
+      <div class="card small"><span class="edge" style="background:var(--bad)"></span><h3 style="font-size:17px">Extension reinjection</h3><p>An extension with host permissions re-injects credentials. Fix: enterprise extension policy only. <span style="color:var(--bad)">Bounded — out of web scope.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MAPPING ============ -->
+<section id="mapping">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">06 · THE MAPPING PROBLEM</div>
+      <h2>"Where is this site's session_id even stored?"</h2>
+      <p class="sub">To purge a session you must first map it. But a value like <span class="mono">localStorage["xyz"] = "eyJhbGci…"</span> looks like any other string. The browser cannot read auth semantics. There are exactly three ways to ever build that map — and no fourth.</p>
+    </div>
+
+    <div class="grid3" style="margin-bottom:26px">
+      <div class="card"><span class="edge" style="background:var(--p3)"></span><span class="tag" style="color:var(--p3)">(a) Inference / observation</span><h3>Watch &amp; taint</h3><p>Detect a login event (OAuth redirect returns a code; a credentialed POST gets a Set-Cookie), then taint everything written in the next few navigations as that session's lineage. <strong>Works with no cooperation — but lossy</strong>, misses lazily-fetched tokens, and can't see <em>into</em> the value to know the account.</p></div>
+      <div class="card"><span class="edge" style="background:var(--p4)"></span><span class="tag" style="color:var(--p4)">(b) Browser owns the moment</span><h3>FedCM / WebAuthn</h3><p>When login goes through a browser-mediated API, the browser <em>is</em> the issuance point — it knows RP, IdP, account, timestamp natively. <strong>Precise and per-account</strong> — but only covers logins that used those APIs (a minority today).</p></div>
+      <div class="card"><span class="edge" style="background:var(--p2)"></span><span class="tag" style="color:var(--p2)">(c) The site tells you</span><h3>RP declares</h3><p>The site writes its session into an identity-scoped bucket or declares it via a <span class="mono">navigator.sessions</span>-style API. <strong>Precise &amp; per-account</strong> — but violates the "no RP cooperation" constraint.</p></div>
+    </div>
+
+    <div class="callout">
+      <div class="ct">There is no fourth option</div>
+      <p>You cannot get a reliable, per-account <span class="mono">session_id → location</span> map for an arbitrary uncooperative site <em>and</em> avoid both inference's lossiness and the in-memory blind spot. A token in Redux state in a live tab is invisible to every method above — you can't enumerate it, only evict it by tearing down the tab.</p>
+    </div>
+
+    <h3 style="font-size:22px;margin:36px 0 16px">Real auth libraries — where the id actually lives, and what reaches it</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Auth pattern</th><th>Where the id lives</th><th>Inference catches it?</th><th>Purge reaches it?</th><th>Defeated across copy-cases by…</th></tr></thead>
+        <tbody>
+          <tr><td>Classic server session <span class="mono" style="color:var(--fg-3)">(PHPSESSID)</span></td><td>HttpOnly cookie</td><td class="good">yes (Set-Cookie)</td><td class="good">yes</td><td>CAEP server revocation</td></tr>
+          <tr><td>Supabase / Firebase SPA</td><td>IndexedDB (+ localStorage)</td><td class="part">partly (post-login writes)</td><td class="good">yes</td><td>DBSC + CAEP</td></tr>
+          <tr><td>Auth0 SPA SDK</td><td>in-memory + refresh cookie</td><td class="part">cookie yes, memory no</td><td class="part">cookie yes · memory needs teardown</td><td>DBSC + CAEP</td></tr>
+          <tr><td>OAuth bearer in app state <span class="mono" style="color:var(--fg-3)">(Redux/Zustand)</span></td><td>JS heap only</td><td class="bad">no (never persisted)</td><td class="bad">no — only context teardown</td><td>CAEP (server) — purge can't help</td></tr>
+          <tr><td>PWA with offline cache</td><td>Service Worker + Cache API</td><td class="part">partly</td><td class="good">yes (+ terminate worker)</td><td>CAEP + worker termination</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="svg-cap">The Redux/in-memory row is the cleanest illustration of the thesis: the map is <em>empty by construction</em> — there is no persistent location to point at, only a live heap you must tear down.</p>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="architecture">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">07 · RECOMMENDED ARCHITECTURE</div>
+      <h2>Five layers, each owning exactly one problem</h2>
+      <p class="sub">No silver bullet — a layered system where each layer is independently useful and incrementally adoptable, and none pretends to cover another's job.</p>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <div class="viewtoggle" data-group="arch">
+        <button class="on" data-v="simple">Simple view</button>
+        <button data-v="complex">Complex view</button>
+      </div>
+    </div>
+
+    <div class="view show" data-view="arch-simple">
+      <div class="stack">
+        <div class="layer" style="border-left-color:var(--p3)"><span class="lz">Layer A</span><div><h4 style="color:var(--p3)">Anti-theft</h4><p>Device-bound, short-lived credentials (DBSC; DPoP for token APIs). Makes a copied credential worthless off-device.</p></div><span class="own">requires RP adoption</span></div>
+        <div class="layer" style="border-left-color:var(--p2)"><span class="lz">Layer B</span><div><h4 style="color:var(--p2)">Server validity</h4><p>IdP emits CAEP <span class="mono">session-revoked</span>; RP receivers kill server sessions; the IdP <strong>always ends its own session</strong> (closes the re-login undo).</p></div><span class="own">IdP-cooperative</span></div>
+        <div class="layer" style="border-left-color:var(--p1)"><span class="lz">Layer C</span><div><h4 style="color:var(--p1)">Browser cleanup · the floor</h4><p>The novel layer: verify signal → check binding/policy scope → ordered teardown of all client surfaces. <strong>No RP cooperation.</strong></p></div><span class="own">browser-only</span></div>
+        <div class="layer" style="border-left-color:var(--p4)"><span class="lz">Layer D</span><div><h4 style="color:var(--p4)">Enterprise control</h4><p>Policy-pinned trusted IdPs, mandatory enforcement, extension restrictions, managed profiles. Solves trust where it's hardest.</p></div><span class="own">admin-provisioned</span></div>
+        <div class="layer" style="border-left-color:var(--fg-3)"><span class="lz">Layer E</span><div><h4>Fallback &amp; recovery</h4><p>Crash-safe journaling, enforce-on-reconnect, provenance UI, per-IdP distrust toggle.</p></div><span class="own">resilience</span></div>
+      </div>
+    </div>
+
+    <div class="view" data-view="arch-complex">
+      <div class="svgbox">
+        <svg viewBox="0 0 920 470" role="img" aria-label="Layered architecture with data flow">
+          <defs>
+            <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#6F7E9F"/></marker>
+            <marker id="arrG" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#4ADE80"/></marker>
+          </defs>
+          <!-- actors -->
+          <rect x="20" y="30" width="150" height="64" rx="10" fill="#141E36" stroke="#4ADE80"/>
+          <text x="95" y="58" text-anchor="middle" class="lbl-t" fill="#4ADE80">Identity Provider</text>
+          <text x="95" y="78" text-anchor="middle" class="lbl-s">ends SSO · emits SET</text>
+
+          <rect x="20" y="380" width="150" height="64" rx="10" fill="#141E36" stroke="#A78BFA"/>
+          <text x="95" y="408" text-anchor="middle" class="lbl-t" fill="#A78BFA">RP server</text>
+          <text x="95" y="428" text-anchor="middle" class="lbl-s">CAEP receiver · DBSC refresh</text>
+
+          <!-- browser box -->
+          <rect x="300" y="20" width="600" height="430" rx="14" fill="rgba(20,30,54,.5)" stroke="#26324F"/>
+          <text x="320" y="46" class="lbl-s" fill="#6F7E9F">BROWSER PROCESS</text>
+
+          <rect x="330" y="62" width="250" height="58" rx="9" fill="#141E36" stroke="#4ADE80"/>
+          <text x="455" y="86" text-anchor="middle" class="lbl">Verifier + binding store</text>
+          <text x="455" y="104" text-anchor="middle" class="lbl-s">JWKS · grant/policy · serials</text>
+
+          <rect x="610" y="62" width="260" height="58" rx="9" fill="#141E36" stroke="#26324F"/>
+          <text x="740" y="86" text-anchor="middle" class="lbl">Revocation journal</text>
+          <text x="740" y="104" text-anchor="middle" class="lbl-s">crash-safe · enforce-on-boot</text>
+
+          <rect x="330" y="150" width="540" height="86" rx="10" fill="#141E36" stroke="#56CCF2"/>
+          <text x="350" y="176" class="lbl" fill="#56CCF2">Revocation engine — ordered teardown</text>
+          <text x="350" y="198" class="lbl-s">1 gate re-auth → 2 kill live → 3 destroy keys → 4 purge residue → 5 attest</text>
+          <text x="350" y="216" class="lbl-s">blocks new origin requests until purge confirms (closes the race)</text>
+
+          <rect x="330" y="266" width="540" height="160" rx="10" fill="rgba(8,12,24,.6)" stroke="#26324F"/>
+          <text x="350" y="290" class="lbl-s" fill="#6F7E9F">SESSION-KEYED STORAGE SERVICE</text>
+          <!-- surfaces mini -->
+          <g class="lbl-s" fill="#A6B3D0" font-size="10">
+            <rect x="350" y="304" width="110" height="34" rx="6" fill="#101a30" stroke="#26324F"/><text x="405" y="325" text-anchor="middle">cookies / partitions</text>
+            <rect x="470" y="304" width="110" height="34" rx="6" fill="#101a30" stroke="#26324F"/><text x="525" y="325" text-anchor="middle">localStorage / IDB</text>
+            <rect x="590" y="304" width="110" height="34" rx="6" fill="#101a30" stroke="#26324F"/><text x="645" y="325" text-anchor="middle">Cache / SW</text>
+            <rect x="710" y="304" width="150" height="34" rx="6" fill="#101a30" stroke="#26324F"/><text x="785" y="325" text-anchor="middle">live contexts / bfcache</text>
+            <rect x="350" y="348" width="510" height="60" rx="6" fill="#0d1426" stroke="#26324F"/>
+            <text x="605" y="372" text-anchor="middle" class="lbl-s" fill="#A6B3D0">every write labeled with SessionID &amp; encrypted under its key</text>
+            <text x="605" y="390" text-anchor="middle" class="lbl-s" fill="#4ADE80">⇒ revocation = destroy one key + drop one partition</text>
+          </g>
+
+          <!-- flows -->
+          <path d="M170,62 C 240,62 250,86 328,86" fill="none" stroke="#4ADE80" stroke-width="2" marker-end="url(#arrG)"/>
+          <text x="240" y="54" class="lbl-s" fill="#4ADE80">signed signal</text>
+          <path d="M455,120 L455,148" fill="none" stroke="#6F7E9F" stroke-width="2" marker-end="url(#arr)"/>
+          <path d="M600,193 L608,193" fill="none" stroke="#6F7E9F" stroke-width="2"/>
+          <path d="M600,236 L600,264" fill="none" stroke="#6F7E9F" stroke-width="2" marker-end="url(#arr)"/>
+          <path d="M170,410 C 230,410 250,300 328,200" fill="none" stroke="#A78BFA" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arr)"/>
+          <text x="185" y="350" class="lbl-s" fill="#A78BFA">P2 validity</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="callout good" style="margin-top:26px">
+      <div class="ct">Must never be cleared</div>
+      <p>Revoking a <em>session</em> must never destroy the <strong>password manager / saved credentials</strong> — that's the re-login path. Nor other origins' data, profile-wide settings, or history. The floor and the ceiling of acceptable deletion nearly coincide: everything for this origin, nothing outside it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FLOW ============ -->
+<section id="flow">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">08 · THE OPTIMAL FLOW</div>
+      <h2>One button, the right order</h2>
+      <p class="sub">Order is everything. Suppress re-auth <em>first</em> so nothing logs back in mid-teardown; kill live state <em>before</em> deleting storage so a running worker can't resurrect it; verify <em>last</em>. This is the sequence the console runs.</p>
+    </div>
+    <div class="svgbox">
+      <svg viewBox="0 0 940 220" role="img" aria-label="Ordered revocation flow">
+        <defs><marker id="fa" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker></defs>
+        <!-- start -->
+        <rect x="10" y="80" width="120" height="60" rx="12" fill="#141E36" stroke="#4ADE80"/>
+        <text x="70" y="106" text-anchor="middle" class="lbl" fill="#4ADE80">Revoke</text>
+        <text x="70" y="124" text-anchor="middle" class="lbl-s">trusted signal</text>
+
+        <g font-family="IBM Plex Mono">
+          <!-- steps -->
+          <g>
+            <rect x="160" y="78" width="118" height="64" rx="10" fill="#141E36" stroke="#56CCF2"/>
+            <text x="219" y="100" text-anchor="middle" class="lbl-s" fill="#56CCF2">STEP 1</text>
+            <text x="219" y="116" text-anchor="middle" class="lbl-s" fill="#E8EDF9">gate re-auth</text>
+            <text x="219" y="131" text-anchor="middle" class="lbl-s" fill="#6F7E9F">grant · auto-reauth</text>
+          </g>
+          <g>
+            <rect x="300" y="78" width="118" height="64" rx="10" fill="#141E36" stroke="#56CCF2"/>
+            <text x="359" y="100" text-anchor="middle" class="lbl-s" fill="#56CCF2">STEP 2</text>
+            <text x="359" y="116" text-anchor="middle" class="lbl-s" fill="#E8EDF9">kill live</text>
+            <text x="359" y="131" text-anchor="middle" class="lbl-s" fill="#6F7E9F">SW · sockets</text>
+          </g>
+          <g>
+            <rect x="440" y="78" width="118" height="64" rx="10" fill="#141E36" stroke="#F5A623"/>
+            <text x="499" y="100" text-anchor="middle" class="lbl-s" fill="#F5A623">STEP 3</text>
+            <text x="499" y="116" text-anchor="middle" class="lbl-s" fill="#E8EDF9">destroy keys</text>
+            <text x="499" y="131" text-anchor="middle" class="lbl-s" fill="#6F7E9F">crypto-erase</text>
+          </g>
+          <g>
+            <rect x="580" y="78" width="118" height="64" rx="10" fill="#141E36" stroke="#56CCF2"/>
+            <text x="639" y="100" text-anchor="middle" class="lbl-s" fill="#56CCF2">STEP 4</text>
+            <text x="639" y="116" text-anchor="middle" class="lbl-s" fill="#E8EDF9">purge residue</text>
+            <text x="639" y="131" text-anchor="middle" class="lbl-s" fill="#6F7E9F">all StorageKeys</text>
+          </g>
+          <g>
+            <rect x="720" y="78" width="118" height="64" rx="10" fill="#141E36" stroke="#56CCF2"/>
+            <text x="779" y="100" text-anchor="middle" class="lbl-s" fill="#56CCF2">STEP 5</text>
+            <text x="779" y="116" text-anchor="middle" class="lbl-s" fill="#E8EDF9">tear down tabs</text>
+            <text x="779" y="131" text-anchor="middle" class="lbl-s" fill="#6F7E9F">bfcache · prerender</text>
+          </g>
+          <g>
+            <rect x="850" y="78" width="80" height="64" rx="10" fill="#141E36" stroke="#4ADE80"/>
+            <text x="890" y="104" text-anchor="middle" class="lbl-s" fill="#4ADE80">STEP 6</text>
+            <text x="890" y="122" text-anchor="middle" class="lbl-s" fill="#E8EDF9">attest</text>
+          </g>
+        </g>
+        <!-- arrows -->
+        <g stroke="#4ADE80" stroke-width="2" fill="none">
+          <path d="M130,110 L158,110" marker-end="url(#fa)"/>
+          <path d="M278,110 L298,110" marker-end="url(#fa)"/>
+          <path d="M418,110 L438,110" marker-end="url(#fa)"/>
+          <path d="M558,110 L578,110" marker-end="url(#fa)"/>
+          <path d="M698,110 L718,110" marker-end="url(#fa)"/>
+          <path d="M838,110 L848,110" marker-end="url(#fa)"/>
+        </g>
+        <text x="470" y="40" text-anchor="middle" class="lbl-s" fill="#6F7E9F">new network requests for the origin are BLOCKED until step 4 confirms — closing the async race window</text>
+        <line x1="160" y1="160" x2="838" y2="160" stroke="#26324F" stroke-dasharray="3 3"/>
+        <text x="499" y="180" text-anchor="middle" class="lbl-s" fill="#6F7E9F">if the browser crashes mid-flow → the journal re-runs enforcement before the origin loads again</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CRYPTO / PRIMITIVES ============ -->
+<section id="crypto">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">09 · PRIMITIVES &amp; CRYPTOGRAPHY</div>
+      <h2>The two ideas that change the game</h2>
+      <p class="sub">Of twenty primitives the problem needs, the platform has about nine. The missing ones cluster around three themes — capture the login moment, label the lineage, address the browser. Two cryptographic primitives, if built, would make most of the hard problems dissolve.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card"><span class="edge" style="background:var(--p3)"></span>
+        <span class="tag" style="color:var(--p3)">SPECULATIVE · the jewel</span>
+        <h3>Credential-bound storage encryption</h3>
+        <p>Each session's lineage is encrypted under a SessionKey held in hardware. <strong>Revocation = destroy one key.</strong> Instant, offline-capable, race-free, per-session precise, and ciphertext copies die with the key. Turns revocation from <em>enumerate-and-delete</em> into <em>forget-one-secret</em>.</p>
+      </div>
+      <div class="card"><span class="edge" style="background:var(--p4)"></span>
+        <span class="tag" style="color:var(--p4)">SPECULATIVE · solves multi-account</span>
+        <h3>Account-keyed storage</h3>
+        <p>The storage key grows an identity dimension: <span class="mono">(origin, top-level site, account)</span>. Per-account revocation becomes a native delete. The multi-account problem — proven impossible today — dissolves <em>by construction</em>.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:22px;margin:36px 0 16px">Cryptographic solution space</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Approach</th><th>Precise revocation?</th><th>Per-account?</th><th>Eliminates copies?</th><th>Browser changes</th></tr></thead>
+        <tbody>
+          <tr><td>DBSC <span class="mono" style="color:var(--fg-3)">(shipping)</span></td><td class="good">per-session</td><td class="part">indirect</td><td class="good">yes · off-device</td><td>small (key destroy on clear)</td></tr>
+          <tr><td>DPoP / mTLS</td><td class="good">per-token</td><td class="bad">server-side</td><td class="good">yes for tokens</td><td>none (JS + server)</td></tr>
+          <tr><td>Browser-held session keys <span class="etag spec">SPEC</span></td><td class="good">yes</td><td class="good">yes</td><td class="part">if checked</td><td>key-per-session custody</td></tr>
+          <tr><td>Key-derived storage partitions <span class="etag spec">SPEC</span></td><td class="good">per-session</td><td class="good">per-account</td><td class="good">ciphertext copies dead</td><td>deep storage-stack surgery</td></tr>
+          <tr><td>Account-bound storage <span class="etag spec">SPEC</span></td><td class="good">yes</td><td class="good">yes</td><td class="part">partial</td><td>account-key lifecycle</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout" style="margin-top:24px">
+      <div class="ct">The recursive discovery</div>
+      <p>Ask repeatedly "what primitive makes the whole problem easier?" and the same answer keeps surfacing: <strong>capture the login moment as a first-class event.</strong> Every future primitive — session keys, account-keyed storage, a session registry — is downstream of the platform simply <em>knowing that, and as whom, a login happened.</em> That is the missing keystone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GOVERNANCE / STANDARDS ============ -->
+<section id="standards">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">10 · GOVERNANCE &amp; STANDARDIZATION</div>
+      <h2>What's a browser feature, a web standard, an enterprise policy</h2>
+      <p class="sub">Standardizing authority over a website's client state is as much a governance problem as a technical one. Get the layering of <em>who decides</em> wrong and it fails review on privacy or RP-autonomy grounds.</p>
+    </div>
+
+    <div class="grid2" style="align-items:start;margin-bottom:28px">
+      <div class="panel">
+        <div class="stage-label">Where each piece belongs</div>
+        <div class="stack">
+          <div class="layer" style="border-left-color:var(--p1);grid-template-columns:1fr auto"><div><h4 style="color:var(--p1)">Browser feature</h4><p>The destruction engine, grant-gating, the verifier, the poller. Prototype in one engine, no standard required.</p></div><span class="own">ship first</span></div>
+          <div class="layer" style="border-left-color:var(--p4);grid-template-columns:1fr auto"><div><h4 style="color:var(--p4)">Web standard</h4><p>FedCM <span class="mono">revocation_endpoint</span> + grant-scoped semantics; CAEP <span class="mono">session-revoked</span> as the payload; a "browser receiver" role in Shared Signals.</p></div><span class="own">multi-engine</span></div>
+          <div class="layer" style="border-left-color:var(--p3);grid-template-columns:1fr auto"><div><h4 style="color:var(--p3)">Enterprise policy</h4><p>Trust provisioning outside FedCM, mandatory enforcement, extension restrictions. Stays policy <em>permanently</em>.</p></div><span class="own">managed</span></div>
+          <div class="layer" style="border-left-color:var(--fg-3);grid-template-columns:1fr auto"><div><h4>Vendor-specific</h4><p>A browser-owning IdP's account→browser channel as a low-latency accelerator. Acceptable, non-interoperable.</p></div><span class="own">optional</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="stage-label">Likely to be adopted vs. fail review</div>
+        <p class="small" style="color:var(--p4);font-family:var(--mono);margin:6px 0 4px">▸ LIKELY ADOPTED</p>
+        <p class="small muted" style="margin:0 0 14px">CAEP / SSF (already shipping). A FedCM revocation extension — natural fit, active working group, inherited privacy model. The minimum viable path.</p>
+        <p class="small" style="color:var(--bad);font-family:var(--mono);margin:6px 0 4px">▸ LIKELY TO FAIL REVIEW</p>
+        <p class="small muted" style="margin:0">Spec-level <em>third-party</em> Clear-Site-Data triggers (RP-autonomy objection — keep it internal). Push-based consumer transport (privacy). Any <strong>flow-inference binding</strong> — a browser silently building a login graph won't survive review. Forced cross-origin tab reloads draw scrutiny as "disruptive."</p>
+      </div>
+    </div>
+
+    <div class="stage-label">Incremental adoption roadmap</div>
+    <div class="road">
+      <div class="road-item"><div class="when">Phase 0 · weeks</div><h4>Extension proof-of-concept</h4><p>Origin-scoped purge driven by a polled, signed IdP endpoint. Validates the deletion + transport loop with no fork. Measures completeness.</p></div>
+      <div class="road-item"><div class="when">Phase 1 · the enterprise product</div><h4>Native build behind flag + policy</h4><p>The ordered teardown over the existing browser purge stack, gated on FedCM grants or policy allowlist. This is the honest first deployment — trust is provisioned, collateral is acceptable.</p></div>
+      <div class="road-item"><div class="when">Phase 2 · the consumer standard</div><h4>FedCM revocation extension</h4><p>IdP-initiated, grant-scoped revocation carrying CAEP SETs, with mandatory logged-out + auto-reauth clearing. One working group, one living spec.</p></div>
+      <div class="road-item"><div class="when">Phase 3 · the lift to guarantee</div><h4>DBSC + CAEP coupling</h4><p>Device binding everywhere and server-side validity turn the browser <em>floor</em> into a real guarantee against copied and server-honored credentials.</p></div>
+      <div class="road-item"><div class="when">Phase 4 · the science</div><h4>Session registry + crypto-erase storage</h4><p>Capture every login, label the lineage, and make revocation a key-destruction operation. The long-horizon research that makes per-account precision native.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ IDEAL ARCHITECTURE ============ -->
+<section id="ideal">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">11 · THE IDEAL</div>
+      <h2>If a browser were redesigned for this</h2>
+      <p class="sub">The Session-Native Browser: every login mints a Session object, every write knows its owner, every session has a hardware-custodied key whose destruction <em>is</em> the revocation.</p>
+    </div>
+    <div class="svgbox">
+      <svg viewBox="0 0 920 430" role="img" aria-label="The Session-Native Browser">
+        <defs><marker id="ia" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#6F7E9F"/></marker></defs>
+        <rect x="20" y="20" width="880" height="390" rx="16" fill="rgba(20,30,54,.4)" stroke="#26324F"/>
+        <text x="44" y="48" class="lbl-s" fill="#6F7E9F">BROWSER PROCESS</text>
+
+        <!-- capture -->
+        <rect x="44" y="64" width="380" height="76" rx="11" fill="#141E36" stroke="#4ADE80"/>
+        <text x="64" y="90" class="lbl" fill="#4ADE80">Login-event capture</text>
+        <text x="64" y="110" class="lbl-s">FedCM · WebAuthn · password fill · OAuth redirect</text>
+        <text x="64" y="126" class="lbl-s">→ mints a SessionID at the moment of authentication</text>
+
+        <!-- registry -->
+        <rect x="44" y="156" width="380" height="92" rx="11" fill="#141E36" stroke="#56CCF2"/>
+        <text x="64" y="182" class="lbl" fill="#56CCF2">Session registry &amp; identity graph</text>
+        <text x="64" y="202" class="lbl-s">accounts ─ sessions ─ artifacts ─ IdPs</text>
+        <text x="64" y="220" class="lbl-s">delegation records: revocation capabilities</text>
+        <text x="64" y="238" class="lbl-s">minted with user consent at login</text>
+
+        <!-- verifier + engine -->
+        <rect x="44" y="264" width="380" height="126" rx="11" fill="#141E36" stroke="#A78BFA"/>
+        <text x="64" y="290" class="lbl" fill="#A78BFA">Verifier + revocation engine</text>
+        <text x="64" y="310" class="lbl-s">signed signal: poll · SSF · sync · or user via QR</text>
+        <text x="64" y="330" class="lbl-s">1 gate re-auth   2 kill live   3 destroy keys</text>
+        <text x="64" y="348" class="lbl-s">4 purge residue   5 attest receipt</text>
+        <text x="64" y="372" class="lbl-s" fill="#6F7E9F">journal · idempotent · enforce-on-boot</text>
+
+        <!-- storage service -->
+        <rect x="448" y="64" width="430" height="326" rx="12" fill="rgba(8,12,24,.6)" stroke="#F5A623"/>
+        <text x="468" y="90" class="lbl" fill="#F5A623">Session-keyed storage service</text>
+        <g class="lbl-s" fill="#A6B3D0">
+          <text x="468" y="118">every write is labeled with its SessionID</text>
+          <text x="468" y="138">and encrypted under that session's key</text>
+          <text x="468" y="158">partitions carry an account dimension</text>
+        </g>
+        <rect x="468" y="180" width="390" height="92" rx="9" fill="#101a30" stroke="#26324F"/>
+        <text x="663" y="208" text-anchor="middle" class="lbl" fill="#E8EDF9">revocation = destroy one key</text>
+        <text x="663" y="230" text-anchor="middle" class="lbl-s">+ drop one partition</text>
+        <text x="663" y="252" text-anchor="middle" class="lbl-s" fill="#4ADE80">instant · offline · race-free · per-account</text>
+        <g class="lbl-s" fill="#6F7E9F">
+          <text x="468" y="298">honest residue, handled by composed layers:</text>
+          <text x="468" y="318" fill="#A78BFA">· server-side validity → DBSC refresh-gating + CAEP</text>
+          <text x="468" y="338" fill="#FF6B6B">· plaintext token already in a heap → context teardown</text>
+          <text x="468" y="358" fill="#FF6B6B">· copies that left the device → binding, not deletion</text>
+        </g>
+
+        <path d="M234,140 L234,154" stroke="#6F7E9F" stroke-width="2" marker-end="url(#ia)"/>
+        <path d="M234,248 L234,262" stroke="#6F7E9F" stroke-width="2" marker-end="url(#ia)"/>
+        <path d="M424,327 L446,327" stroke="#6F7E9F" stroke-width="2" marker-end="url(#ia)"/>
+      </svg>
+    </div>
+    <p class="thesis-quote" style="margin-top:40px">The web never built the <span class="hl">Session</span> as an object — and every difficulty in browser-mediated revocation is the shadow of that missing primitive.</p>
+  </div>
+</section>
+
+<!-- ============ VERDICTS ============ -->
+<section id="verdicts">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">12 · VERDICTS</div>
+      <h2>Feasible now · needs cooperation · impossible</h2>
+      <p class="sub">Brutally honest boundaries, sorted by what they demand.</p>
+    </div>
+    <div class="verdicts3">
+      <div class="vcol now">
+        <div class="vh">Feasible today</div>
+        <ul>
+          <li>Origin / StorageKey purge + worker termination + context teardown</li>
+          <li>FedCM grant revocation + auto-reauth suppression (FedCM logins)</li>
+          <li>Profiles / containers as proactive per-account isolation</li>
+          <li>Enterprise: policy-provisioned trust, mandatory enforcement</li>
+          <li>CAEP server-side revocation for cooperating RPs</li>
+        </ul>
+      </div>
+      <div class="vcol coop">
+        <div class="vh">Needs cooperation</div>
+        <ul>
+          <li>Server-side token invalidation (P2) — RP receiver / short TTLs</li>
+          <li>Anti-theft for copied credentials (P3) — RP adopts DBSC</li>
+          <li>Cross-device / cross-browser kill — server revocation or vendor sync</li>
+          <li>Stop silent re-login (P4a) — IdP ends its own session</li>
+          <li>Per-account precision — RP partitions storage, or future account-keyed storage</li>
+        </ul>
+      </div>
+      <div class="vcol imposs">
+        <div class="vh">Impossible / structural</div>
+        <ul>
+          <li>Invalidating a credential that already left the browser, browser-only</li>
+          <li>Per-account deletion of black-box RP storage</li>
+          <li>Scrubbing a live JS/WASM heap without destroying the context</li>
+          <li>Zero race window with async multi-process deletion</li>
+          <li>Reaching extension / native copies; guaranteed delivery to an offline browser</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:30px">
+      <div class="callout good" style="margin:0">
+        <div class="ct">Most worth prototyping first</div>
+        <p>The FedCM-grant-scoped revocation path behind a flag — instrumented for the two numbers that decide whether it's real or cosmetic: the <strong>live-tab race window</strong> and the <strong>re-login-within-60-seconds rate</strong>.</p>
+      </div>
+      <div class="callout" style="margin:0">
+        <div class="ct">Most worth standardizing first</div>
+        <p>The FedCM revocation extension, with CAEP <span class="mono">session-revoked</span> adopted verbatim as the payload. One working group, inherited privacy review.</p>
+      </div>
+      <div class="callout bad" style="margin:0">
+        <div class="ct">Most likely to be cosmetic</div>
+        <p>Front-channel logout iframes (already broken by storage partitioning), and any "logout" that changes UI while leaving credentials valid. Flow-inference binding looks clever and collapses under per-tenant IdP domains and privacy review.</p>
+      </div>
+      <div class="callout" style="margin:0;border-left-color:var(--bad)">
+        <div class="ct" style="color:var(--bad)">Biggest unsolved problem</div>
+        <p>Trustworthy acquisition of the <span class="mono">(IdP, RP, account)</span> binding with <em>no</em> RP participation — the authority problem. The runner-up, invalidating a copied credential browser-only, isn't unsolved: it's <em>impossible</em>, which is more final.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RESEARCH AGENDA ============ -->
+<section id="research">
+  <span class="anchor"></span>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="num">13 · OPEN PROBLEMS</div>
+      <h2>The research agenda &amp; the blind spots</h2>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="stage-label">Biggest blind spots in current literature</div>
+        <ul class="small muted" style="font-family:var(--serif);line-height:1.7;padding-left:18px">
+          <li><strong>Nobody has measured where sessions actually live</strong> across top sites — the coverage denominator for every claim here.</li>
+          <li>Logout is specified as an RP courtesy, never as an enforceable property.</li>
+          <li>No browser-receiver role exists in CAEP/SSF — the device holding the state is absent from the architecture.</li>
+          <li>The multi-account problem is unaddressed in FedCM, CSD and CAEP alike.</li>
+          <li>Execution-context revocation has uneven cross-engine support and no defined interaction with bfcache/prerender.</li>
+          <li>The re-login undo loop is undocumented as a failure mode in any logout spec.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <div class="stage-label">Next-step experiments</div>
+        <ul class="small muted" style="font-family:var(--serif);line-height:1.7;padding-left:18px">
+          <li><strong>Session-storage census</strong> — crawl top-N sites; classify cookie-only vs token-in-storage vs SW-cached vs memory-held.</li>
+          <li>Extension PoC measuring deletion completeness across surfaces.</li>
+          <li>Race-window measurement on the ordered teardown.</li>
+          <li><strong>Re-login-rate measurement</strong> with and without IdP session termination — the number that separates real from cosmetic.</li>
+          <li>Service-worker-zombie test: verify no worker serves authed responses post-enforcement.</li>
+          <li>Adversarial signal tests: forged, replayed, flooded.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap">
+    <div class="grid2">
+      <div>
+        <p class="thesis-quote" style="font-size:clamp(20px,2.6vw,28px)">Browser purge is a floor. Device binding is the anti-theft layer. Server evaluation is the authority. Compose them — don't confuse them.</p>
+      </div>
+      <div>
+        <p class="epi">
+          <b>EPISTEMIC STATUS.</b><br>
+          <span class="etag fact">FACT</span> verifiable against current specs, source &amp; shipped behavior<br>
+          <span class="etag inf">INFER</span> reasoned from facts<br>
+          <span class="etag prop">PROP</span> a design proposal<br>
+          <span class="etag spec">SPEC</span> does not exist in any engine — may never
+        </p>
+        <p class="epi" style="margin-top:18px"><b>NOTE.</b> Browser internals and spec status move month to month. Version-sensitive facts — DBSC rollout, FedCM feature/version mapping, Chromium module paths — should be re-verified against current sources before being relied upon for implementation, publication, or filing. This page is a research synthesis, not legal or security advice.</p>
+        <div class="badge-row">
+          <span class="pill"><span class="d" style="background:var(--p1)"></span>P1 local state</span>
+          <span class="pill"><span class="d" style="background:var(--p2)"></span>P2 validity</span>
+          <span class="pill"><span class="d" style="background:var(--p3)"></span>P3 portability</span>
+          <span class="pill"><span class="d" style="background:var(--p4)"></span>P4 authority</span>
+        </div>
+      </div>
+    </div>
+    <hr class="hr">
+    <p class="epi">The Missing Session · a research thesis on browser-mediated federated session revocation · built as a single self-contained page for GitHub Pages.</p>
+  </div>
+</footer>
+
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- simple/complex view toggles ---------- */
+  document.querySelectorAll('.viewtoggle').forEach(function(vt){
+    var group = vt.getAttribute('data-group');
+    vt.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        vt.querySelectorAll('button').forEach(function(b){b.classList.remove('on');});
+        btn.classList.add('on');
+        var v = btn.getAttribute('data-v');
+        document.querySelectorAll('[data-view^="'+group+'"]').forEach(function(view){
+          view.classList.toggle('show', view.getAttribute('data-view') === group+'-'+v);
+        });
+      });
+    });
+  });
+
+  /* ---------- bypass logic (shared by console) ---------- */
+  var state = { dbsc:false, caep:false, revoked:false };
+
+  // verdict for each case given layers. purge always on.
+  // returns {cls, label}
+  function caseVerdict(c){
+    var dbsc = state.dbsc, caep = state.caep, purged = state.revoked;
+    // CAEP kills value at server for every case
+    if(caep) return {cls:'killed', label:'KILLED · server'};
+    if(c === 'smsb'){
+      if(dbsc) return {cls:'killed', label:'KILLED · bound'};
+      return purged ? {cls:'partial', label:'PARTIAL'} : {cls:'survives', label:'SURVIVES'};
+    }
+    if(c === 'mem'){
+      // in-memory: purge can't touch a copy already read; teardown helps locally only
+      if(dbsc) return {cls:'killed', label:'KILLED · bound'};
+      return {cls:'survives', label:'SURVIVES'};
+    }
+    // smdb, dmsb, dmdb : cross browser/device — purge never reaches
+    if(dbsc) return {cls:'killed', label:'KILLED · bound'};
+    return {cls:'survives', label:'SURVIVES'};
+  }
+
+  function renderBypass(){
+    document.querySelectorAll('#bypass .bp').forEach(function(bp){
+      var c = bp.getAttribute('data-case');
+      var v = caseVerdict(c);
+      bp.classList.remove('killed','survives','partial');
+      bp.classList.add(v.cls);
+      bp.querySelector('.verdict').textContent = v.label;
+    });
+    // verdict line
+    var vl = document.getElementById('vline');
+    if(state.caep){
+      vl.innerHTML = '<b>All cases killed.</b> Server-side revocation invalidates the value at the validation point — it doesn\'t matter where the copy sits.';
+    } else if(state.dbsc){
+      vl.innerHTML = '<b>Copies neutralized.</b> Device binding makes the stolen id worthless off the original machine — but the server would still honor it on-device until it expires.';
+    } else if(state.revoked){
+      vl.innerHTML = '<b>Floor only.</b> Local state is gone, yet 4 of 5 copy-cases survive. This is the proof that purge alone is never enough — add the layers above.';
+    } else {
+      vl.innerHTML = 'Toggle <b>DBSC</b> and <b>CAEP</b>, then press <b>Revoke everywhere</b>. Watch which copy-and-replay attacks the browser floor can — and cannot — stop.';
+    }
+  }
+
+  function setTog(el, key){
+    el.addEventListener('click', function(){
+      state[key] = !state[key];
+      el.classList.toggle('on', state[key]);
+      renderBypass();
+    });
+  }
+  setTog(document.getElementById('togDbsc'),'dbsc');
+  setTog(document.getElementById('togCaep'),'caep');
+
+  /* ---------- the revocation pipeline animation ---------- */
+  var steps = Array.prototype.slice.call(document.querySelectorAll('#pipe .step'));
+  var surfaces = Array.prototype.slice.call(document.querySelectorAll('#surfaces .surf'));
+  var revokeBtn = document.getElementById('revoke');
+  var resetBtn = document.getElementById('reset');
+  var lamp = document.getElementById('lamp');
+  var conStatus = document.getElementById('constatus');
+  var running = false;
+
+  function resetConsole(){
+    running = false; state.revoked = false;
+    steps.forEach(function(s){s.classList.remove('active','done');});
+    surfaces.forEach(function(s){s.classList.remove('purged','resist'); s.classList.add('alive'); s.querySelector('.ss').textContent='alive';});
+    lamp.classList.remove('live');
+    conStatus.textContent = 'STATUS: AUTHENTICATED';
+    revokeBtn.disabled = false;
+    renderBypass();
+  }
+
+  function purgeSurface(s, i){
+    setTimeout(function(){
+      // tab-memory surface resists pure storage purge (needs context teardown / shows residual)
+      if(s.getAttribute('data-mem')==='1' && !state.dbsc && !state.caep){
+        s.classList.remove('alive'); s.classList.add('resist');
+        s.querySelector('.ss').textContent='residual';
+      } else {
+        s.classList.remove('alive','resist'); s.classList.add('purged');
+        s.querySelector('.ss').textContent='purged';
+      }
+    }, i*90);
+  }
+
+  function runRevocation(){
+    if(running) return;
+    running = true; revokeBtn.disabled = true;
+    conStatus.textContent = 'STATUS: REVOKING…';
+
+    if(reduce){
+      // no animation: jump to end
+      steps.forEach(function(s){s.classList.add('done');});
+      surfaces.forEach(function(s,i){purgeSurface(s,0);});
+      state.revoked = true; lamp.classList.add('live');
+      conStatus.textContent = 'STATUS: CLIENT STATE DESTROYED'; running=false; revokeBtn.disabled=false;
+      renderBypass(); return;
+    }
+
+    var delay = 0, stepGap = 620;
+    steps.forEach(function(s, idx){
+      setTimeout(function(){
+        steps.forEach(function(x){x.classList.remove('active');});
+        s.classList.add('active');
+        // step 4 = destroy, step 5 = teardown -> purge surfaces around here
+        if(idx === 3){ surfaces.forEach(function(sf,i){ if(sf.getAttribute('data-mem')!=='1') purgeSurface(sf,i); }); }
+        if(idx === 4){ surfaces.forEach(function(sf,i){ if(sf.getAttribute('data-mem')==='1') purgeSurface(sf,i); }); }
+      }, delay);
+      setTimeout(function(){ s.classList.remove('active'); s.classList.add('done'); }, delay + stepGap - 120);
+      delay += stepGap;
+    });
+
+    setTimeout(function(){
+      state.revoked = true;
+      lamp.classList.add('live');
+      conStatus.textContent = 'STATUS: CLIENT STATE DESTROYED';
+      running = false; revokeBtn.disabled = false;
+      renderBypass();
+    }, delay + 120);
+  }
+
+  revokeBtn.addEventListener('click', runRevocation);
+  resetBtn.addEventListener('click', resetConsole);
+
+  renderBypass();
+
+  /* ---------- active nav link on scroll ---------- */
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id], header'));
+  var navlinks = Array.prototype.slice.call(document.querySelectorAll('.navlinks a'));
+  if('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          var id = e.target.id;
+          navlinks.forEach(function(a){
+            a.style.color = a.getAttribute('href') === '#'+id ? 'var(--fg)' : '';
+            a.style.background = a.getAttribute('href') === '#'+id ? 'var(--ink-3)' : '';
+          });
+        }
+      });
+    }, {rootMargin:'-45% 0px -50% 0px'});
+    sections.forEach(function(s){ if(s.id) obs.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
