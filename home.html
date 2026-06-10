@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manishi Gautam — Research</title>
+<meta name="description" content="Manishi Gautam — research on browser-mediated federated session revocation: why 'log out everywhere' doesn't work, and how to fix it.">
+<style>
+  :root{
+    --bg:#fdfdfc; --ink:#1a1a1a; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#0f62fe; --soft:#f3f4f6; --good:#15803d; --warn:#b45309; --bad:#b91c1c;
+    --serif:"Georgia","Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  [data-theme="dark"]{
+    --bg:#101214; --ink:#e8eaed; --muted:#9aa0a6; --line:#2a2e33;
+    --accent:#7ab4ff; --soft:#1a1d21; --good:#4ade80; --warn:#fbbf24; --bad:#f87171;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;transition:background .3s,color .3s}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:720px;margin:0 auto;padding:0 1.25rem}
+
+  /* nav */
+  nav{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);z-index:10}
+  .nav-in{max-width:720px;margin:0 auto;padding:.65rem 1.25rem;display:flex;align-items:center;gap:1rem}
+  .nav-in b{font-size:.95rem}
+  .nav-in .links{margin-left:auto;display:flex;gap:1rem;align-items:center;font-size:.85rem}
+  .nav-in .links a{color:var(--muted)}
+  .nav-in .links a:hover{color:var(--accent)}
+  #mode{background:none;border:1px solid var(--line);border-radius:18px;color:var(--ink);padding:.2rem .7rem;cursor:pointer;font-size:.8rem}
+
+  /* hero */
+  .hero{padding:3.5rem 0 2.5rem;border-bottom:1px solid var(--line)}
+  .hero .row{display:flex;gap:1.4rem;align-items:center;flex-wrap:wrap}
+  .avatar{width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.7rem;flex-shrink:0}
+  .hero h1{font-size:1.7rem;letter-spacing:-.02em}
+  .hero p{color:var(--muted);font-size:.95rem;max-width:540px}
+  .hero .meta{margin-top:.4rem;font-size:.85rem;display:flex;gap:1rem;flex-wrap:wrap}
+
+  /* article */
+  article{padding:2.5rem 0 1rem}
+  .kicker{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  article h1.title{font-family:var(--serif);font-size:2rem;line-height:1.25;margin:.5rem 0 .6rem;letter-spacing:-.01em}
+  .subtitle{color:var(--muted);font-size:1.02rem;margin-bottom:1rem}
+  .byline{font-size:.85rem;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:1.4rem;margin-bottom:1.8rem}
+
+  article h2{font-family:var(--serif);font-size:1.4rem;margin:2.6rem 0 .8rem;letter-spacing:-.01em}
+  article h3{font-size:1.02rem;margin:1.6rem 0 .5rem}
+  article p{margin:.8rem 0}
+  article ul,article ol{margin:.8rem 0 .8rem 1.4rem}
+  article li{margin:.35rem 0}
+  code{background:var(--soft);border-radius:4px;padding:.1rem .35rem;font-size:.85em;font-family:ui-monospace,Menlo,Consolas,monospace}
+  pre{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:1rem;overflow-x:auto;font-size:.8rem;line-height:1.55;margin:1rem 0}
+  pre code{background:none;padding:0}
+
+  .lead{font-size:1.08rem;font-family:var(--serif)}
+  .pull{border-left:3px solid var(--accent);padding:.7rem 1rem;background:var(--soft);border-radius:0 8px 8px 0;margin:1.2rem 0;font-size:.95rem}
+  .pull.warn{border-color:var(--warn)} .pull.bad{border-color:var(--bad)} .pull.good{border-color:var(--good)}
+
+  /* four problems grid */
+  .grid4{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin:1.2rem 0}
+  @media(max-width:560px){.grid4{grid-template-columns:1fr}}
+  .pcard{border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem;background:var(--soft)}
+  .pcard b{display:block;font-size:.92rem;margin-bottom:.2rem}
+  .pcard span{font-size:.83rem;color:var(--muted)}
+  .pcard .tag{display:inline-block;font-size:.68rem;font-weight:700;border-radius:10px;padding:.05rem .5rem;margin-top:.45rem}
+  .t-good{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+  .t-warn{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+  .t-bad{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+
+  /* tables */
+  .tw{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:.83rem;min-width:560px}
+  th,td{padding:.5rem .7rem;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--soft);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  .y{color:var(--good);font-weight:600}.n{color:var(--bad);font-weight:600}.p{color:var(--warn);font-weight:600}
+
+  /* accordions */
+  details{border:1px solid var(--line);border-radius:10px;margin:.55rem 0;background:var(--bg)}
+  summary{cursor:pointer;padding:.75rem 1rem;font-weight:600;font-size:.92rem;list-style:none;user-select:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+ ";color:var(--accent);font-weight:700}
+  details[open] summary::before{content:"− "}
+  details .body{padding:0 1rem 1rem;font-size:.92rem}
+
+  /* verdicts */
+  .verdict{margin:1rem 0;padding:.9rem 1rem;border:1px solid var(--line);border-radius:10px}
+  .verdict b.q{display:block;font-size:.95rem}
+  .verdict .a{font-size:.9rem;color:var(--muted);margin-top:.3rem}
+  .verdict .ans{font-weight:800;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}
+
+  /* epistemic badges */
+  .ep{font-size:.66rem;font-weight:800;letter-spacing:.04em;border-radius:4px;padding:.05rem .35rem;vertical-align:middle}
+  .ep-f{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good)}
+  .ep-i{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+  .ep-s{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+
+  /* toc */
+  .toc{border:1px solid var(--line);border-radius:10px;padding:1rem 1.2rem;background:var(--soft);font-size:.88rem;margin:1.5rem 0}
+  .toc b{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  .toc ol{margin:.5rem 0 0 1.2rem}
+  .toc li{margin:.2rem 0}
+
+  footer{border-top:1px solid var(--line);margin-top:3rem;padding:2rem 0 3rem;color:var(--muted);font-size:.85rem;text-align:center}
+</style>
+</head>
+<body>
+
+<nav><div class="nav-in">
+  <b>Manishi Gautam</b>
+  <div class="links">
+    <a href="#post">Research</a>
+    <a href="#verdicts">Verdicts</a>
+    <a href="#contact">Contact</a>
+    <button id="mode">Dark</button>
+  </div>
+</div></nav>
+
+<!-- ======== PROFILE ======== -->
+<header class="hero"><div class="wrap"><div class="row">
+  <div class="avatar">MG</div>
+  <div>
+    <h1>Manishi Gautam</h1>
+    <p>I research browser security and federated identity — specifically, the gap between what "log out" promises and what it actually does.</p>
+    <div class="meta">
+      <a href="https://github.com/" target="_blank">GitHub</a>
+      <a href="#contact">Email</a>
+      <span style="color:var(--muted)">Browser internals · FedCM · OAuth/OIDC · Zero trust</span>
+    </div>
+  </div>
+</div></div></header>
+
+<!-- ======== ARTICLE ======== -->
+<article id="post"><div class="wrap">
+
+  <span class="kicker">Research · Browser Security</span>
+  <h1 class="title">"Log Out Everywhere" Is a Lie. Here's What It Would Take to Make It True.</h1>
+  <p class="subtitle">Browser-mediated federated session revocation — a research-grade map of why logout fails across browser state surfaces, and the layered architecture that could actually fix it.</p>
+  <p class="byline">Manishi Gautam · Long-form research document · ~25 min read</p>
+
+  <p class="lead">"Log out everywhere" is one of the most-promised and least-delivered features in modern web security. Users believe clicking it at Google or Okta terminates their sessions everywhere. In practice, it usually terminates one server record at the identity provider — and leaves every website's client-side state, cookies, stored tokens, service-worker caches, and in-memory credentials fully intact and usable.</p>
+
+  <p>This document treats that gap as a real research problem and maps its entire solution space. The central question: <strong>can the browser — the one component that physically holds a website's session state — be made into an enforcement point</strong>, so a trusted signal can destroy that state even when the website never implemented logout properly?</p>
+
+  <div class="toc">
+    <b>Contents</b>
+    <ol>
+      <li><a href="#s1">Logout is not one problem — it's four</a></li>
+      <li><a href="#s2">Where sessions actually hide</a></li>
+      <li><a href="#s3">Why every existing mechanism falls short</a></li>
+      <li><a href="#s4">How revocation gets bypassed</a></li>
+      <li><a href="#s5">Verdicts — direct answers</a></li>
+      <li><a href="#s6">The architecture that could work</a></li>
+      <li><a href="#s7">What to prototype and standardize first</a></li>
+      <li><a href="#s8">Open questions</a></li>
+    </ol>
+  </div>
+
+  <p style="font-size:.85rem;color:var(--muted)">Epistemic labels used throughout:
+    <span class="ep ep-f">FACT</span> verifiable against specs/source ·
+    <span class="ep ep-i">INFERENCE</span> reasoned from facts ·
+    <span class="ep ep-s">SPECULATIVE</span> exists in no engine. Browser behavior moves fast; version-sensitive claims should be re-verified.</p>
+
+  <!-- ---- S1 ---- -->
+  <h2 id="s1">1 · Logout is not one problem — it's four</h2>
+  <p>Most failed "logout everywhere" promises are a category error: solving one of these problems and claiming the others were solved too. Keeping them separate is the single most important analytical move in this work.</p>
+
+  <div class="grid4">
+    <div class="pcard"><b>P1 — Local stale state</b><span>The website's client artifacts persist in <em>this</em> browser: cookies, tokens, caches.</span><br><span class="tag t-good">BROWSER-SOLVABLE</span></div>
+    <div class="pcard"><b>P2 — Credential validity</b><span>The website's server still honors the tokens it issued, regardless of client state.</span><br><span class="tag t-bad">SERVER-ONLY, BY CONSTRUCTION</span></div>
+    <div class="pcard"><b>P3 — Credential portability</b><span>The credential was copied off-device before revocation. No cleanup can reach it.</span><br><span class="tag t-warn">CRYPTOGRAPHIC BINDING ONLY</span></div>
+    <div class="pcard"><b>P4 — Trust &amp; authorization</b><span>Who may instruct the browser to destroy state for an origin — scoped and authenticated how?</span><br><span class="tag t-warn">THE GENUINELY OPEN PROBLEM</span></div>
+  </div>
+
+  <div class="pull bad"><strong>The trap inside P4 (P4a):</strong> if the identity provider's own login session survives revocation, the website silently re-logs the user in seconds later — and the entire revocation is undone. Any design that skips terminating the provider session is <em>cosmetic, not real</em>.</div>
+
+  <p>Plus the supporting cast: <strong>P5</strong> multi-account precision (two users, one origin, one storage bucket), <strong>P6</strong> offline browsers that never hear the signal, <strong>P7</strong> the revocation channel becoming a tracking vector, and <strong>P8</strong> the "why was I signed out?" UX cost.</p>
+
+  <!-- ---- S2 ---- -->
+  <h2 id="s2">2 · Where sessions actually hide</h2>
+  <p><span class="ep ep-f">FACT</span> Two structural facts shape everything. First, Chromium partitions storage by a <strong>StorageKey</strong> — origin + top-level site + ancestor bit — which contains <strong>no "account" dimension</strong>. Second, cookies are scoped to the <strong>registrable domain</strong> (eTLD+1), so clearing <code>abc.com</code> also clears <code>sub.abc.com</code>.</p>
+
+  <div class="tw"><table>
+    <tr><th>Surface</th><th>Per-account delete?</th><th>Survives restart?</th><th>Survives theft/copy?</th></tr>
+    <tr><td>Cookies (incl. HttpOnly)</td><td class="n">No</td><td class="y">Yes</td><td class="n">Yes — copies work elsewhere</td></tr>
+    <tr><td>localStorage / IndexedDB</td><td class="n">No</td><td class="y">Yes</td><td class="n">Yes, if exported</td></tr>
+    <tr><td>Cache Storage / HTTP cache</td><td class="n">No</td><td class="y">Yes</td><td class="p">If copied</td></tr>
+    <tr><td>Service Worker + caches</td><td class="n">No</td><td class="y">Yes — can <em>resurrect</em> state</td><td class="p">Caches yes</td></tr>
+    <tr><td>Live JS/WASM memory</td><td class="n">n/a</td><td class="y">No</td><td class="p">Only if memory-dumped</td></tr>
+    <tr><td>bfcache / prerender</td><td class="n">No</td><td class="y">No — but restores a live authed page</td><td class="y">No</td></tr>
+    <tr><td>Extension storage</td><td class="n">Out of reach entirely</td><td class="n">Yes</td><td class="n">Yes</td></tr>
+    <tr><td><b>Browser profile / container</b></td><td class="y"><b>Yes — the only real per-account boundary</b></td><td class="y">Yes</td><td class="p">If profile copied</td></tr>
+  </table></div>
+
+  <p>Three load-bearing conclusions <span class="ep ep-i">INFERENCE</span>:</p>
+  <ol>
+    <li>Every <em>persistent</em> surface is reliably deletable by the browser — but <strong>none is labeled by account</strong>. Deletion is by origin, never by "which user."</li>
+    <li><em>Live memory</em> cannot be scrubbed; it can only be evicted by destroying the execution context — disruptive and reload-based.</li>
+    <li><em>Copyable</em> surfaces defeat browser-only revocation entirely once copied. The copy lives outside the browser's jurisdiction.</li>
+  </ol>
+
+  <!-- ---- S3 ---- -->
+  <h2 id="s3">3 · Why every existing mechanism falls short</h2>
+  <p>Each mechanism below is honest about one problem and silent about the rest. Verdicts: <em>floor</em> (minimum local enforcement), <em>bridge</em> (partial), or <em>real</em> (solves its layer).</p>
+
+  <details><summary>Clear-Site-Data — the perfect engine with the wrong trigger</summary><div class="body">
+    <p><span class="ep ep-f">FACT</span> An HTTP header by which a site tells the browser to wipe its own cookies, storage, caches, and execution contexts. Complete destruction — but <strong>only the relying party itself can send it</strong>, and the entire premise of this research is the non-cooperating relying party. The heart of the proposal is reusing this destruction engine under a different, trusted trigger.</p></div></details>
+
+  <details><summary>OIDC Front-Channel Logout — eroding into cosmetic</summary><div class="body">
+    <p><span class="ep ep-f">FACT</span> The provider loads each website's logout URL in hidden iframes. The spec itself warns the iframe "might not be able to access the RP's login state" cross-origin — and third-party cookie blocking has largely broken it. <strong>Verdict: cosmetic in modern browsers.</strong></p></div></details>
+
+  <details><summary>OIDC Back-Channel Logout &amp; CAEP/Shared Signals — server-side, client-blind</summary><div class="body">
+    <p><span class="ep ep-f">FACT</span> Signed server-to-server events (CAEP's <code>session-revoked</code> Security Event Token) propagate revocation between cooperating servers in near-real-time. This is the right answer for <strong>P2</strong> — but the receiver is a server, never the browser. <strong>The device physically holding the client state is absent from the architecture.</strong> That blind spot is precisely the gap this research targets.</p></div></details>
+
+  <details><summary>FedCM — the trust anchor, not yet an enforcer</summary><div class="body">
+    <p><span class="ep ep-f">FACT</span> The browser's FedCM <strong>grant ledger</strong> records which sites a user federated into through which provider — a privacy-reviewed, browser-witnessed record. It cleanly answers <em>who may revoke what</em> (P4): a provider may act only on relying parties it demonstrably federated. But no IdP-initiated destruction primitive exists today, and the ledger only exists where sites adopted FedCM.</p></div></details>
+
+  <details><summary>DBSC — the anti-theft layer</summary><div class="body">
+    <p><span class="ep ep-f">FACT</span> Device Bound Session Credentials tie a session to a hardware key (TPM/secure enclave): a copied cookie is worthless off-device, and the server can kill a session by refusing to refresh it. Solves <strong>P3</strong> for adopters. It is not a cleanup mechanism and does nothing for sites that haven't adopted it.</p></div></details>
+
+  <details><summary>Enterprise policy &amp; browser profiles — the honest answers nobody markets</summary><div class="body">
+    <p><span class="ep ep-i">INFERENCE</span> In a managed fleet, trust provisioning solves P4 by fiat, full-origin collateral is acceptable, and extensions can be restricted — <strong>the best near-term deployment</strong>. And profiles/containers are the <em>only</em> mechanism giving true per-account isolation — by prevention, not deletion.</p></div></details>
+
+  <div class="tw"><table>
+    <tr><th>Mechanism</th><th>Problem it owns</th><th>Needs cooperation from</th><th>Verdict</th></tr>
+    <tr><td>Clear-Site-Data</td><td>P1 (engine)</td><td>RP</td><td class="p">Engine, wrong trigger</td></tr>
+    <tr><td>Front-Channel Logout</td><td>multi-RP logout</td><td>RP</td><td class="n">Eroding / cosmetic</td></tr>
+    <tr><td>Back-Channel / CAEP</td><td>P2</td><td>IdP + RP servers</td><td class="y">Real for P2; client-blind</td></tr>
+    <tr><td>FedCM grant ledger</td><td>P4 anchor</td><td>RP used FedCM</td><td class="y">Foundation, not enforcement</td></tr>
+    <tr><td>DBSC</td><td>P3</td><td>RP adoption</td><td class="y">Real anti-theft layer</td></tr>
+    <tr><td>Enterprise policy</td><td>P4 provisioning</td><td>Admin only</td><td class="y">Best near-term path</td></tr>
+    <tr><td>Profiles / containers</td><td>P5</td><td>User discipline</td><td class="y">Real, by prevention</td></tr>
+  </table></div>
+
+  <!-- ---- S4 ---- -->
+  <h2 id="s4">4 · How revocation gets bypassed</h2>
+  <ul>
+    <li><strong>Copied tokens (P3).</strong> Exported before revocation, they work elsewhere. Browser cleanup is powerless; only DBSC + server revocation help. <em>Bounded only.</em></li>
+    <li><strong>Tokens already in memory.</strong> A live tab keeps making authenticated calls after storage is wiped. Only context destruction evicts them; a sub-second race remains.</li>
+    <li><strong>Service-worker resurrection.</strong> A running worker re-creates state post-wipe. Must terminate, unregister, then <em>re-verify</em> nothing re-registered.</li>
+    <li><strong>Re-login resurrection (P4a).</strong> The page reloads, the provider session is still alive, and the user is silently signed back in. <em>The single most likely failure in practice.</em></li>
+    <li><strong>Multi-account collateral (P5).</strong> Two accounts, one origin, one StorageKey — the browser cannot target one. Structurally unsolved.</li>
+    <li><strong>Partitioned-storage traps.</strong> An origin's state exists under <em>multiple</em> StorageKeys (first-party and embedded). Miss one and the wipe is incomplete — a classic correctness trap.</li>
+    <li><strong>Compromised provider.</strong> Equals the provider's existing power to forge identity itself — no new trust assumption; bounded to forced-logout DoS of its own relying parties.</li>
+  </ul>
+
+  <!-- ---- S5 ---- -->
+  <h2 id="s5">5 · Verdicts — direct answers</h2>
+  <div id="verdicts">
+
+    <div class="verdict"><b class="q">Is browser-only logout enough?</b>
+      <div class="a"><span class="ans" style="color:var(--bad)">No.</span> It's a floor. It reliably destroys local state in one browser and is powerless against server-honored tokens and copied credentials. Claiming otherwise is the central error this document exists to refute.</div></div>
+
+    <div class="verdict"><b class="q">Is per-account browser deletion possible?</b>
+      <div class="a"><span class="ans" style="color:var(--bad)">No — structurally.</span> Storage location is a function of (origin, top-level site, ancestor bit). "Account" is not an argument of that function. The only per-account boundaries are browser-owned objects and the profile/container.</div></div>
+
+    <div class="verdict"><b class="q">Is full-origin deletion the right default?</b>
+      <div class="a"><span class="ans" style="color:var(--good)">Yes.</span> The browser can't label data by account or confirm a value is "auth." Destroying everything for the origin is the only model immune to every site's storage-schema quirks.</div></div>
+
+    <div class="verdict"><b class="q">Can a non-browser-owning IdP (Okta, Facebook) safely order deletion?</b>
+      <div class="a"><span class="ans" style="color:var(--warn)">Yes — within a strict boundary.</span> Only for relying parties the browser can independently bind to that provider (FedCM grant, enterprise allowlist, or attested binding), with a signature that verifies against its published keys. <strong>No binding → no action.</strong> Inferring bindings by watching network traffic is privacy-corrosive and lossy; off by default.</div></div>
+
+    <div class="verdict"><b class="q">What is most likely to fail in practice?</b>
+      <div class="a"><span class="ans" style="color:var(--bad)">Two front-runners.</span> Flow-inference binding (gutted by per-tenant provider domains; won't survive privacy review) — and any design that skips ending the provider's own session, which demos perfectly and is undone by silent re-login seconds later.</div></div>
+
+  </div>
+
+  <!-- ---- S6 ---- -->
+  <h2 id="s6">6 · The architecture that could work</h2>
+  <p>No single layer covers all four problems, so the strongest realizable system is <strong>five layers, each owning exactly one job</strong> and refusing to claim another's:</p>
+  <ul>
+    <li><strong>A — Anti-theft (P3):</strong> device-bound, short-lived credentials (DBSC/DPoP). Requires site adoption; without it, P3 is simply uncovered.</li>
+    <li><strong>B — Server validity (P2):</strong> CAEP <code>session-revoked</code> events to cooperating servers — and the provider <em>always</em> ends its own SSO session (closes P4a).</li>
+    <li><strong>C — Browser cleanup (P1, the novel layer):</strong> a browser-process revocation service: verify signal → check binding scope → ordered teardown. <em>No relying-party cooperation needed.</em></li>
+    <li><strong>D — Enterprise control (P4):</strong> policy-pinned trusted providers, mandatory enforcement, managed profiles.</li>
+    <li><strong>E — Recovery (P6/P8):</strong> crash-safe journaling, enforce-on-reconnect, provenance UI ("signed out by your identity provider").</li>
+  </ul>
+
+  <h3>The enforcement sequence (Layer C)</h3>
+<pre><code>On verified, in-scope revocation signal for origin O:
+
+ 1. AUTHORITY   revoke FedCM grant · login-status = logged-out
+                · clear auto-reauth        (nothing re-logs-in mid-teardown)
+ 2. LIVE FIRST  terminate service/shared workers · cancel in-flight
+                requests · flush sockets   (stop resurrection + races)
+ 3. PURGE       cookies (ALL partition keys) + local/sessionStorage
+                + IndexedDB + caches, across ALL StorageKeys of O
+ 4. CONTEXTS    tear down live documents · evict bfcache · cancel prerender
+ 5. VERIFY      confirm no SW re-registered · journal completion
+
+ Block new requests for O until step 3 confirms.
+ NEVER touch: saved passwords, other origins, history.</code></pre>
+
+  <div class="pull good"><strong>Why the ordering matters:</strong> delete the <em>authority to re-authenticate</em> first, kill the <em>live things</em> second, purge disk third. Reverse it, and a service worker or auto-reauth quietly rebuilds the session behind the wipe.</div>
+
+  <!-- ---- S7 ---- -->
+  <h2 id="s7">7 · What to prototype and standardize first</h2>
+  <p><strong>Prototype first:</strong> the FedCM-grant-scoped revocation path in Chromium behind a flag — signed-event poll → verify → ordered purge — instrumented to measure the two numbers that decide whether this idea is real or cosmetic:</p>
+  <ol>
+    <li>the <strong>live-tab race window</strong> (how long an in-flight request can still authenticate post-revocation), and</li>
+    <li>the <strong>re-login-within-60-seconds rate</strong> (how often a wiped session silently restores).</li>
+  </ol>
+  <p><strong>Standardize first:</strong> a FedCM revocation extension — provider <code>revocation_endpoint</code>, grant-scoped enforcement, mandatory logged-out semantics — carrying CAEP's <code>session-revoked</code> event verbatim as payload. One working group, one living spec, inherited privacy review.</p>
+  <p><strong>Deploy first:</strong> the enterprise-managed fleet, where trust provisioning solves the hardest problem (P4) by policy and full-origin collateral is acceptable. The consumer web follows.</p>
+
+  <!-- ---- S8 ---- -->
+  <h2 id="s8">8 · Open questions</h2>
+  <details><summary>The measurement gap — the biggest blind spot</summary><div class="body"><p><span class="ep ep-i">INFERENCE</span> No published corpus measures what fraction of top sites are cookie-only vs. localStorage-token vs. service-worker-cached vs. memory-held. That single dataset determines the real-world coverage of any browser floor — and would anchor a strong measurement paper. <strong>This comes first.</strong></p></div></details>
+  <details><summary>Account-keyed storage &amp; credential-bound encryption <span class="ep ep-s">SPECULATIVE</span></summary><div class="body"><p>The only two known routes to per-account precision and deletion-free revocation: storage buckets tagged to a federated account (deletes only that account's bucket — but the site must write into them, quietly reintroducing cooperation), and origin storage encrypted under a session-derived key, where <em>revocation destroys the key</em> — fast, offline-capable, copy-resistant ciphertext. Both are far from any engine today.</p></div></details>
+  <details><summary>Governance, latency, cross-engine convergence</summary><div class="body"><p>Who decides which providers a browser trusts to enforce — user, enterprise, or registry? Does polling suffice or do high-risk cases need push? Will WebKit and Gecko map the same signal to equivalent destruction given different partitioning models?</p></div></details>
+
+  <h2>The bottom line</h2>
+  <p class="lead">Today, logout is a courtesy the website may or may not extend. The research agenda is to make <em>client-state termination</em> a property the platform can guarantee on a trusted signal — with the honest caveat, stated plainly and permanently: invalidating a <em>copied</em> credential browser-only is not unsolved. It is impossible, which is a different and more final thing.</p>
+
+</div></article>
+
+<!-- ======== CONTACT ======== -->
+<section id="contact"><div class="wrap" style="padding:1rem 1.25rem 0">
+  <h2 style="font-family:var(--serif);font-size:1.3rem">Get in touch</h2>
+  <p style="color:var(--muted);font-size:.92rem">Working on browser security, identity standards, or want to collaborate on the measurement study or Chromium prototype?</p>
+  <p style="font-size:.92rem">📧 manishi.gautam@example.com &nbsp;·&nbsp; 🐙 github.com/manishigautam &nbsp;·&nbsp; 🔗 linkedin.com/in/manishigautam</p>
+</div></section>
+
+<footer>© <span id="yr"></span> Manishi Gautam · Research notes on browser security &amp; federated identity</footer>
+
+<script>
+  const m=document.getElementById('mode'),b=document.body;
+  if(localStorage.getItem('t'))b.dataset.theme=localStorage.getItem('t');
+  sync();
+  m.onclick=()=>{b.dataset.theme=b.dataset.theme==='dark'?'':'dark';localStorage.setItem('t',b.dataset.theme);sync();};
+  function sync(){m.textContent=b.dataset.theme==='dark'?'Light':'Dark';}
+  document.getElementById('yr').textContent=new Date().getFullYear();
+</script>
+</body>
+</html>
